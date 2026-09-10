@@ -17,11 +17,4 @@ final class PredictionCopyTests: XCTestCase {
       "北京时间 08:00–12:00"
     )
   }
-
-  func testReliabilityExplainsConfidenceInPlainLanguage() {
-    XCTAssertEqual(PredictionCopy.reliability("high"), "比较靠谱")
-    XCTAssertEqual(PredictionCopy.reliability("medium"), "仅供参考")
-    XCTAssertEqual(PredictionCopy.reliability("low"), "证据很弱")
-    XCTAssertEqual(PredictionCopy.reliabilityTitle("low"), "为什么证据很弱")
-  }
 }

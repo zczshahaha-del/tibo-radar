@@ -8,12 +8,11 @@ struct NotificationDecision: Equatable, Sendable {
 
 enum NotificationPolicy {
   static func decide(
-    previousProbability: Int?,
+    previousSignal: SignalStrength?,
     previousEventIDs: Set<String>,
-    snapshot: PredictionSnapshot,
-    threshold: Int = 65
+    snapshot: PredictionSnapshot
   ) -> NotificationDecision? {
-    guard let previousProbability else { return nil }
+    guard let previousSignal else { return nil }
 
     let newEvent = snapshot.latestEvents.first { event in
       !previousEventIDs.contains(event.id)
@@ -26,10 +25,14 @@ enum NotificationPolicy {
       )
     }
 
-    if previousProbability < threshold, snapshot.combined24h >= threshold {
-      let reason = snapshot.evidence.last?.detail ?? snapshot.level.label
+    if previousSignal.rank < SignalStrength.strong.rank,
+      snapshot.overallSignal.rank >= SignalStrength.strong.rank
+    {
+      let reason = snapshot.evidence.first?.detail ?? snapshot.analysisNote
       return NotificationDecision(
-        title: "Tibo Radar：24 小时概率升至 \(snapshot.combined24h)%",
+        title: snapshot.overallSignal == .announced
+          ? "Tibo Radar：发现明确预告"
+          : "Tibo Radar：发现值得关注的信号",
         body: "\(reason) 最可能时段：\(snapshot.likelyWindow)"
       )
     }
@@ -50,22 +53,19 @@ actor NotificationManager {
     )
   }
 
-  func process(_ snapshot: PredictionSnapshot, threshold: Int = 65) async {
-    let previousProbability: Int? =
-      defaults.object(
-        forKey: "previousCombined24h"
-      ) as? Int
+  func process(_ snapshot: PredictionSnapshot) async {
+    let previousSignal = defaults.string(forKey: "previousSignalStrength")
+      .flatMap(SignalStrength.init(rawValue:))
     let previousEventIDs = Set(
       defaults.stringArray(forKey: "previousEventIDs") ?? []
     )
     let decision = NotificationPolicy.decide(
-      previousProbability: previousProbability,
+      previousSignal: previousSignal,
       previousEventIDs: previousEventIDs,
-      snapshot: snapshot,
-      threshold: threshold
+      snapshot: snapshot
     )
 
-    defaults.set(snapshot.combined24h, forKey: "previousCombined24h")
+    defaults.set(snapshot.overallSignal.rawValue, forKey: "previousSignalStrength")
     defaults.set(snapshot.latestEvents.map(\.id), forKey: "previousEventIDs")
 
     guard let decision else { return }

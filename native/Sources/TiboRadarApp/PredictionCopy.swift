@@ -24,20 +24,4 @@ enum PredictionCopy {
     value = value.trimmingCharacters(in: .whitespacesAndNewlines)
     return value.isEmpty ? "暂时算不出" : value
   }
-
-  static func reliability(_ confidence: String) -> String {
-    switch confidence.lowercased() {
-    case "high": "比较靠谱"
-    case "medium": "仅供参考"
-    default: "证据很弱"
-    }
-  }
-
-  static func reliabilityTitle(_ confidence: String) -> String {
-    switch confidence.lowercased() {
-    case "high": "为什么比较靠谱"
-    case "medium": "为什么只能参考"
-    default: "为什么证据很弱"
-    }
-  }
 }

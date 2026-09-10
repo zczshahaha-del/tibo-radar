@@ -13,40 +13,29 @@ struct AIAnalysisEvidence: Codable, Equatable, Sendable {
 }
 
 struct AIAnalysis: Codable, Equatable, Sendable {
-  let global24h: Int
-  let global48h: Int
-  let banked24h: Int
-  let banked48h: Int
-  let affectedUserBanked24h: Int?
-  let confidence: String
-  let confidenceNote: String
+  let globalSignal: SignalStrength
+  let bankedSignal: SignalStrength
+  let affectedUserSignal: SignalStrength?
+  let analysisNote: String
   let likelyWindow: String
   let summary: String
   let evidence: [AIAnalysisEvidence]
 
   enum CodingKeys: String, CodingKey {
-    case global24h = "global_24h"
-    case global48h = "global_48h"
-    case banked24h = "banked_24h"
-    case banked48h = "banked_48h"
-    case affectedUserBanked24h = "affected_user_banked_24h"
-    case confidence
-    case confidenceNote = "confidence_note"
+    case globalSignal = "global_signal"
+    case bankedSignal = "banked_signal"
+    case affectedUserSignal = "affected_user_signal"
+    case analysisNote = "analysis_note"
     case likelyWindow = "likely_window"
     case summary, evidence
   }
 
   func validated() throws -> AIAnalysis {
-    let values = [global24h, global48h, banked24h, banked48h]
-      + (affectedUserBanked24h.map { [$0] } ?? [])
-    guard values.allSatisfy({ (0...100).contains($0) }) else {
-      throw AIProviderError.invalidAnalysis("模型返回了 0–100 以外的概率。")
-    }
-    guard !confidenceNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+    guard !analysisNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
       !likelyWindow.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
       !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     else {
-      throw AIProviderError.invalidAnalysis("模型结果缺少解释或时间窗口。")
+      throw AIProviderError.invalidAnalysis("模型结果缺少判断原因或时间窗口。")
     }
     return self
   }
@@ -55,22 +44,9 @@ struct AIAnalysis: Codable, Equatable, Sendable {
     bundle: SourceBundle,
     now: Date = Date()
   ) -> PredictionSnapshot {
-    let global48 = max(global24h, global48h)
-    let banked48 = max(banked24h, banked48h)
-    let combined24 = Self.union(global24h, banked24h)
-    let combined48 = max(combined24, Self.union(global48, banked48))
-    let level: ProbabilityLevel =
-      if combined24 >= 85 {
-        .red
-      } else if combined24 >= 65 {
-        .orange
-      } else if combined24 >= 45 {
-        .yellow
-      } else {
-        .green
-      }
     let metadata = SourceMetadata(bundle: bundle)
     let stale = !bundle.cacheFallbacks.isEmpty || metadata.isOlderThanFourHours(now: now)
+    let calibration = ProbabilityCalibration.evaluate(bundle: bundle)
     var mappedEvidence = evidence.prefix(6).map { item in
       Evidence(
         label: item.label,
@@ -87,17 +63,14 @@ struct AIAnalysis: Codable, Equatable, Sendable {
 
     return PredictionSnapshot(
       generatedAt: now,
-      global24h: global24h,
-      global48h: global48,
-      banked24h: banked24h,
-      banked48h: banked48,
-      combined24h: combined24,
-      combined48h: combined48,
-      affectedUserBanked24h: affectedUserBanked24h,
-      confidence: Self.normalizedConfidence(confidence),
-      confidenceNote: stale ? "部分公开来源来自缓存。\(confidenceNote)" : confidenceNote,
-      level: level,
+      globalSignal: globalSignal,
+      bankedSignal: bankedSignal,
+      affectedUserSignal: affectedUserSignal,
+      analysisNote: stale ? "部分公开来源来自缓存。\(analysisNote)" : analysisNote,
+      summary: summary,
       likelyWindow: likelyWindow,
+      calibratedProbability: stale ? nil : calibration.range,
+      probabilityNote: stale ? "来源已过期，暂不显示概率。" : calibration.note,
       lastResetAt: metadata.lastResetAt,
       dataUpdatedAt: metadata.dataUpdatedAt,
       isStale: stale,
@@ -105,20 +78,6 @@ struct AIAnalysis: Codable, Equatable, Sendable {
       latestEvents: metadata.latestEvents,
       sourceErrors: bundle.errors
     )
-  }
-
-  private static func union(_ first: Int, _ second: Int) -> Int {
-    let value = 1 - (1 - Double(first) / 100) * (1 - Double(second) / 100)
-    return max(0, min(100, Int((value * 100).rounded())))
-  }
-
-  private static func normalizedConfidence(_ value: String) -> String {
-    let lowered = value.lowercased()
-    if lowered.contains("high") || value.contains("高") { return "high" }
-    if lowered.contains("medium") || lowered.contains("moderate") || value.contains("中") {
-      return "medium"
-    }
-    return "low"
   }
 
   private static func normalizedCategory(_ value: String) -> String {

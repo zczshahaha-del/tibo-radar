@@ -4,21 +4,18 @@ import XCTest
 @testable import TiboRadarApp
 
 final class AIAnalysisTests: XCTestCase {
-  func testAnalysisBuildsSnapshotWithoutRuleScoring() throws {
+  func testAnalysisBuildsSemanticSnapshotWithoutModelProbability() throws {
     let analysis = AIAnalysis(
-      global24h: 30,
-      global48h: 55,
-      banked24h: 20,
-      banked48h: 40,
-      affectedUserBanked24h: 91,
-      confidence: "medium",
-      confidenceNote: "有一条官方信号，但没有明确日期。",
-      likelyWindow: "北京时间明晚",
-      summary: "需要关注，但仍缺少明确预告。",
+      globalSignal: .weak,
+      bankedSignal: .none,
+      affectedUserSignal: .announced,
+      analysisNote: "有一条暗示，但没有明确的未来承诺。",
+      likelyWindow: "暂无可靠时间",
+      summary: "可以继续观察，暂时不用改变用量安排。",
       evidence: [
         AIAnalysisEvidence(
           label: "Tibo 暗示",
-          detail: "语气指向未来，但没有明确说重置。",
+          detail: "语气指向未来，但没有明确说会重置。",
           category: "positive",
           sourceURL: "https://example.com/post"
         )
@@ -27,26 +24,24 @@ final class AIAnalysisTests: XCTestCase {
     let now = ISO8601DateFormatter().date(from: "2026-09-10T12:30:00Z")!
     let snapshot = try analysis.validated().snapshot(bundle: bundle(), now: now)
 
-    XCTAssertEqual(snapshot.global24h, 30)
-    XCTAssertEqual(snapshot.banked24h, 20)
-    XCTAssertEqual(snapshot.combined24h, 44)
-    XCTAssertEqual(snapshot.affectedUserBanked24h, 91)
-    XCTAssertEqual(snapshot.confidence, "medium")
+    XCTAssertEqual(snapshot.globalSignal, .weak)
+    XCTAssertEqual(snapshot.bankedSignal, .none)
+    XCTAssertEqual(snapshot.overallSignal, .weak)
+    XCTAssertEqual(snapshot.affectedUserSignal, .announced)
     XCTAssertEqual(snapshot.evidence.first?.label, "Tibo 暗示")
+    XCTAssertNil(snapshot.calibratedProbability)
+    XCTAssertEqual(snapshot.probabilityNote, "还没有足够的历史预测记录，所以先不显示数字。")
     XCTAssertFalse(snapshot.isStale)
   }
 
-  func testAnalysisRejectsOutOfRangeProbability() {
+  func testAnalysisRejectsMissingExplanation() {
     let analysis = AIAnalysis(
-      global24h: 140,
-      global48h: 55,
-      banked24h: 20,
-      banked48h: 40,
-      affectedUserBanked24h: nil,
-      confidence: "high",
-      confidenceNote: "test",
-      likelyWindow: "test",
-      summary: "test",
+      globalSignal: .none,
+      bankedSignal: .none,
+      affectedUserSignal: nil,
+      analysisNote: "",
+      likelyWindow: "暂无可靠时间",
+      summary: "暂无新信号",
       evidence: []
     )
 

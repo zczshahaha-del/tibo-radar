@@ -39,7 +39,7 @@ struct RadarPopoverView: View {
         .padding(.vertical, 13)
         .background(.black.opacity(0.12))
     }
-    .frame(width: 390, height: 610)
+    .frame(width: 390, height: 660)
     .background(.ultraThinMaterial)
   }
 
@@ -98,30 +98,32 @@ struct RadarPopoverView: View {
     VStack(spacing: 12) {
       HStack(alignment: .firstTextBaseline) {
         VStack(alignment: .leading, spacing: 6) {
-          Label(snapshot.level.label, systemImage: "circle.fill")
+          Label(snapshot.overallSignal.label, systemImage: "circle.fill")
             .font(.caption.weight(.semibold))
-            .foregroundStyle(levelColor(snapshot.level))
-          HStack(alignment: .lastTextBaseline, spacing: 2) {
-            Text("\(snapshot.combined24h)")
-              .font(.system(size: 62, weight: .bold, design: .rounded))
-              .monospacedDigit()
-            Text("%")
-              .font(.title2.weight(.bold))
-              .foregroundStyle(levelColor(snapshot.level))
-          }
-          Text("未来 24 小时综合概率")
+            .foregroundStyle(levelColor(snapshot.overallSignal))
+          Text(snapshot.calibratedProbability?.label24h ?? "暂无可靠概率")
+            .font(
+              .system(
+                size: snapshot.calibratedProbability == nil ? 27 : 46,
+                weight: .bold,
+                design: .rounded
+              )
+            )
+            .minimumScaleFactor(0.75)
+            .lineLimit(1)
+          Text("未来 24 小时")
             .font(.callout)
             .foregroundStyle(.secondary)
         }
         Spacer()
         VStack(alignment: .leading, spacing: 12) {
-          metric("48 小时", "\(snapshot.combined48h)%")
+          metric("48 小时", snapshot.calibratedProbability?.label48h ?? "暂无")
+          metric("现在怎么做", snapshot.overallSignal.action)
           metric(
             "最可能什么时候",
             PredictionCopy.likelyTime(snapshot.likelyWindow),
             lineLimit: 2
           )
-          metric("这个判断靠谱吗", PredictionCopy.reliability(snapshot.confidence))
         }
         .frame(width: 128, alignment: .leading)
       }
@@ -129,7 +131,7 @@ struct RadarPopoverView: View {
     .padding(18)
     .background(
       LinearGradient(
-        colors: [levelColor(snapshot.level).opacity(0.16), .black.opacity(0.03)],
+        colors: [levelColor(snapshot.overallSignal).opacity(0.16), .black.opacity(0.03)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
       ),
@@ -137,7 +139,7 @@ struct RadarPopoverView: View {
     )
     .overlay {
       RoundedRectangle(cornerRadius: 17)
-        .stroke(levelColor(snapshot.level).opacity(0.32), lineWidth: 1)
+        .stroke(levelColor(snapshot.overallSignal).opacity(0.32), lineWidth: 1)
     }
   }
 
@@ -162,22 +164,22 @@ struct RadarPopoverView: View {
       categoryRow(
         icon: "globe.asia.australia.fill",
         title: "全局重置",
-        value: snapshot.global24h,
+        value: snapshot.globalSignal.label,
         color: .green
       )
       Divider().padding(.leading, 46)
       categoryRow(
         icon: "creditcard.fill",
         title: "普发重置卡",
-        value: snapshot.banked24h,
+        value: snapshot.bankedSignal.label,
         color: .mint
       )
-      if let affected = snapshot.affectedUserBanked24h {
+      if let affected = snapshot.affectedUserSignal, affected != .none {
         Divider().padding(.leading, 46)
         categoryRow(
           icon: "exclamationmark.triangle.fill",
           title: "故障补发",
-          value: affected,
+          value: affected.label,
           color: .orange,
           badge: "仅受影响用户"
         )
@@ -194,7 +196,7 @@ struct RadarPopoverView: View {
   private func categoryRow(
     icon: String,
     title: String,
-    value: Int,
+    value: String,
     color: Color,
     badge: String? = nil
   ) -> some View {
@@ -215,9 +217,8 @@ struct RadarPopoverView: View {
         }
       }
       Spacer()
-      Text("\(value)%")
-        .font(.system(size: 18, weight: .bold, design: .rounded))
-        .monospacedDigit()
+      Text(value)
+        .font(.system(size: 14, weight: .bold))
     }
     .padding(.vertical, 11)
   }
@@ -225,7 +226,7 @@ struct RadarPopoverView: View {
   private func evidence(_ snapshot: PredictionSnapshot) -> some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
-        Text(PredictionCopy.reliabilityTitle(snapshot.confidence))
+        Text("AI 为什么这么判断")
           .font(.system(size: 12, weight: .bold))
         Spacer()
         if snapshot.isStale {
@@ -235,11 +236,23 @@ struct RadarPopoverView: View {
         }
       }
 
-      Text(snapshot.confidenceNote)
+      Text(snapshot.analysisNote)
         .font(.system(size: 10))
         .foregroundStyle(.secondary)
         .lineLimit(3)
         .fixedSize(horizontal: false, vertical: true)
+
+      Divider()
+
+      VStack(alignment: .leading, spacing: 3) {
+        Text(snapshot.calibratedProbability == nil ? "概率为什么没显示" : "概率怎样得出")
+          .font(.system(size: 10, weight: .semibold))
+          .foregroundStyle(.tertiary)
+        Text(snapshot.probabilityNote)
+          .font(.system(size: 10))
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
+      }
 
       Divider()
 
@@ -351,15 +364,15 @@ struct RadarPopoverView: View {
   private var statusText: String {
     if model.isRefreshing { return "AI 正在判断" }
     if !model.hasAPIKey { return "需要 API Key" }
-    return "AI 预测已启用"
+    return "AI 信号判断已启用"
   }
 
-  private func levelColor(_ level: ProbabilityLevel) -> Color {
+  private func levelColor(_ level: SignalStrength) -> Color {
     switch level {
-    case .green: .green
-    case .yellow: .yellow
-    case .orange: .orange
-    case .red: .red
+    case .none: .green
+    case .weak: .yellow
+    case .strong: .orange
+    case .announced: .red
     }
   }
 

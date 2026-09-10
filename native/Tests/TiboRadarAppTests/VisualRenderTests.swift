@@ -17,17 +17,14 @@ final class VisualRenderTests: XCTestCase {
 
     let snapshot = PredictionSnapshot(
       generatedAt: Date(),
-      global24h: 32,
-      global48h: 50,
-      banked24h: 8,
-      banked48h: 15,
-      combined24h: 37,
-      combined48h: 57,
-      affectedUserBanked24h: 94,
-      confidence: "medium",
-      confidenceNote: "AI 找到一条暗示，但没有明确预告。",
-      level: .green,
+      globalSignal: .weak,
+      bankedSignal: .none,
+      affectedUserSignal: .announced,
+      analysisNote: "AI 找到一条暗示，但没有明确的未来承诺。",
+      summary: "先观察，不需要因为一个猜测改变用量安排。",
       likelyWindow: "北京时间 07:00–10:00",
+      calibratedProbability: nil,
+      probabilityNote: "拿历史数据试算后，结果还不够准，所以先不显示数字。",
       lastResetAt: Date().addingTimeInterval(-2.2 * 86_400),
       dataUpdatedAt: Date(),
       isStale: false,
@@ -58,7 +55,7 @@ final class VisualRenderTests: XCTestCase {
     let view = RadarPopoverView()
       .environmentObject(model)
       .preferredColorScheme(.dark)
-    try render(view, size: CGSize(width: 390, height: 610), to: outputPath)
+    try render(view, size: CGSize(width: 390, height: 660), to: outputPath)
   }
 
   @MainActor
@@ -83,10 +80,10 @@ final class VisualRenderTests: XCTestCase {
         .padding(.bottom, 14)
       Spacer(minLength: 0)
     }
-    .frame(width: 390, height: 610)
+    .frame(width: 390, height: 660)
     .background(.ultraThinMaterial)
     .preferredColorScheme(.dark)
-    try render(view, size: CGSize(width: 390, height: 610), to: outputPath)
+    try render(view, size: CGSize(width: 390, height: 660), to: outputPath)
   }
 
   @MainActor
@@ -113,17 +110,14 @@ final class VisualRenderTests: XCTestCase {
   private func previewSnapshot() -> PredictionSnapshot {
     PredictionSnapshot(
       generatedAt: Date(),
-      global24h: 32,
-      global48h: 50,
-      banked24h: 8,
-      banked48h: 15,
-      combined24h: 37,
-      combined48h: 57,
-      affectedUserBanked24h: nil,
-      confidence: "medium",
-      confidenceNote: "AI evidence",
-      level: .green,
+      globalSignal: .weak,
+      bankedSignal: .none,
+      affectedUserSignal: nil,
+      analysisNote: "AI evidence",
+      summary: "No actionable signal",
       likelyWindow: "无法可靠判断",
+      calibratedProbability: nil,
+      probabilityNote: "拿历史数据试算后，结果还不够准，所以先不显示数字。",
       lastResetAt: nil,
       dataUpdatedAt: Date(),
       isStale: false,

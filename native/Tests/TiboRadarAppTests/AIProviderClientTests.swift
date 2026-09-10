@@ -58,7 +58,10 @@ final class AIProviderClientTests: XCTestCase {
     XCTAssertEqual(body["enable_search"] as? Bool, true)
     XCTAssertEqual(body["model"] as? String, "qwen-plus")
     XCTAssertFalse(String(data: capturedBody ?? Data(), encoding: .utf8)?.contains("test-qwen-key") == true)
-    XCTAssertEqual(analysis.global24h, 35)
+    XCTAssertEqual(analysis.globalSignal, .weak)
+    let requestText = String(data: capturedBody ?? Data(), encoding: .utf8) ?? ""
+    XCTAssertFalse(requestText.contains("global_24h"))
+    XCTAssertTrue(requestText.contains("不得估算或输出任何百分比"))
   }
 
   func testDeepSeekUsesCollectedSourcesWithoutClaimingSearch() async throws {
@@ -120,13 +123,10 @@ final class AIProviderClientTests: XCTestCase {
 
   private static func successBody() -> Data {
     let analysis: [String: Any] = [
-      "global_24h": 35,
-      "global_48h": 52,
-      "banked_24h": 12,
-      "banked_48h": 22,
-      "affected_user_banked_24h": NSNull(),
-      "confidence": "medium",
-      "confidence_note": "证据有限",
+      "global_signal": "weak",
+      "banked_signal": "none",
+      "affected_user_signal": NSNull(),
+      "analysis_note": "只有间接暗示，没有明确预告",
       "likely_window": "无法可靠判断",
       "summary": "目前没有明确预告",
       "evidence": [],

@@ -66,7 +66,7 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
     guard let data = json.data(using: .utf8),
       let analysis = try? JSONDecoder().decode(AIAnalysis.self, from: data)
     else {
-      throw AIProviderError.invalidAnalysis("AI 没有返回约定的预测 JSON。")
+      throw AIProviderError.invalidAnalysis("AI 没有返回约定的信号判断 JSON。")
     }
     return try analysis.validated()
   }
@@ -165,17 +165,22 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
     return """
       \(searchInstruction)
 
-      下面的 public_source_data 是 App 刚采集的公开数据。请识别明确预告、强暗示、玩笑、事后描述、定向故障补偿、普发重置卡、全局额度重置以及无关传言。定向补偿不能提高普发概率；已经发生的事件不能当成未来预告；来源不可靠或信息互相矛盾时必须降低置信度。
+      下面的 public_source_data 是 App 刚采集的公开数据。请识别明确预告、强暗示、玩笑、事后描述、定向故障补偿、普发重置卡、全局额度重置以及无关传言。定向补偿不能算作普发信号；已经发生的事件不能当成未来预告；来源不可靠或信息互相矛盾时必须保守判断。
+
+      你只负责理解语义，不得估算或输出任何百分比。每类信号只能使用以下四级：
+      - none：没有面向未来的有效信号；
+      - weak：只有间接暗示或未经可靠来源确认的传言；
+      - strong：来自可靠来源的强暗示，或多条相互印证的信号，但尚无明确承诺；
+      - announced：Tibo 或官方已经明确承诺未来会重置或发卡。
+
+      对已经发生的重置或补发，应归入历史证据；除非同一原文还承诺了下一次未来动作，否则对应未来信号必须是 none。affected_user_signal 只用于明确限定受影响用户的故障补发。
 
       输出只能是一个 JSON 对象，不能带 Markdown 或额外说明：
       {
-        "global_24h": 0到100整数,
-        "global_48h": 0到100整数,
-        "banked_24h": 0到100整数,
-        "banked_48h": 0到100整数,
-        "affected_user_banked_24h": 0到100整数或null,
-        "confidence": "low或medium或high",
-        "confidence_note": "不超过45个中文字符，直说为什么可靠或不可靠",
+        "global_signal": "none、weak、strong或announced",
+        "banked_signal": "none、weak、strong或announced",
+        "affected_user_signal": "none、weak、strong、announced或null",
+        "analysis_note": "不超过45个中文字符，直说当前有没有值得行动的新信号",
         "likely_window": "只写简短北京时间，如9月11日 08:00–12:00；没有可靠时间必须写暂无可靠时间",
         "summary": "一句话综合判断",
         "evidence": [
@@ -221,6 +226,6 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
   }
 
   private static let systemPrompt = """
-    你是一个谨慎的事件预测分析师。你的任务不是总结新闻，而是根据公开证据估算 Tibo 或 OpenAI 在未来 24/48 小时向 Codex 用户发放福利性全局重置、可储存重置卡或故障补偿的概率。概率是有不确定性的判断，不能把猜测说成官方承诺。必须区分未来预告与已经发生的事情、全体用户与受影响用户、原始来源与社区转述，并同时列出支持证据和反面证据。输出必须是合法 JSON。
+    你是一个谨慎的事件信号分析师。你的任务不是总结新闻，也不是凭感觉制造概率，而是判断公开证据是否包含 Tibo 或 OpenAI 面向未来的福利性全局重置、可储存重置卡或故障补偿信号。必须区分未来预告与已经发生的事情、全体用户与受影响用户、原始来源与社区转述，并同时列出支持证据和反面证据。输出必须是合法 JSON，且不得包含百分比。
     """
 }

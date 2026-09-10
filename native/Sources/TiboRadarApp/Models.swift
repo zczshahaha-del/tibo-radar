@@ -58,58 +58,86 @@ struct RadarEvent: Identifiable, Codable, Equatable, Sendable {
   let state: String?
 }
 
-enum ProbabilityLevel: String, Codable, Equatable, Sendable {
-  case green
-  case yellow
-  case orange
-  case red
+enum SignalStrength: String, Codable, Equatable, Sendable {
+  case none
+  case weak
+  case strong
+  case announced
 
   var label: String {
     switch self {
-    case .green: "正常使用"
-    case .yellow: "开始关注"
-    case .orange: "高关注"
-    case .red: "很可能"
+    case .none: "没有新信号"
+    case .weak: "有一点迹象"
+    case .strong: "值得关注"
+    case .announced: "已有明确预告"
+    }
+  }
+
+  var action: String {
+    switch self {
+    case .none: "正常使用"
+    case .weak: "先观察"
+    case .strong: "可以加速使用"
+    case .announced: "尽快使用"
+    }
+  }
+
+  var rank: Int {
+    switch self {
+    case .none: 0
+    case .weak: 1
+    case .strong: 2
+    case .announced: 3
     }
   }
 }
 
+struct CalibratedProbabilityRange: Codable, Equatable, Sendable {
+  let lower24h: Int
+  let upper24h: Int
+  let lower48h: Int
+  let upper48h: Int
+  let sampleSize: Int
+  let brierScore: Double
+
+  var label24h: String { "\(lower24h)–\(upper24h)%" }
+  var label48h: String { "\(lower48h)–\(upper48h)%" }
+}
+
 struct PredictionSnapshot: Codable, Equatable, Sendable {
   let generatedAt: Date
-  let global24h: Int
-  let global48h: Int
-  let banked24h: Int
-  let banked48h: Int
-  let combined24h: Int
-  let combined48h: Int
-  let affectedUserBanked24h: Int?
-  let confidence: String
-  let confidenceNote: String
-  let level: ProbabilityLevel
+  let globalSignal: SignalStrength
+  let bankedSignal: SignalStrength
+  let affectedUserSignal: SignalStrength?
+  let analysisNote: String
+  let summary: String
   let likelyWindow: String
+  let calibratedProbability: CalibratedProbabilityRange?
+  let probabilityNote: String
   let lastResetAt: Date?
   let dataUpdatedAt: Date?
   let isStale: Bool
   let evidence: [Evidence]
   let latestEvents: [RadarEvent]
   let sourceErrors: [String]
+
+  var overallSignal: SignalStrength {
+    [globalSignal, bankedSignal].max { $0.rank < $1.rank } ?? .none
+  }
 }
 
 extension PredictionSnapshot {
   func markedStale(reason: String) -> PredictionSnapshot {
     PredictionSnapshot(
       generatedAt: generatedAt,
-      global24h: global24h,
-      global48h: global48h,
-      banked24h: banked24h,
-      banked48h: banked48h,
-      combined24h: combined24h,
-      combined48h: combined48h,
-      affectedUserBanked24h: affectedUserBanked24h,
-      confidence: "low",
-      confidenceNote: reason,
-      level: level,
+      globalSignal: globalSignal,
+      bankedSignal: bankedSignal,
+      affectedUserSignal: affectedUserSignal,
+      analysisNote: reason,
+      summary: summary,
       likelyWindow: likelyWindow,
+      calibratedProbability: nil,
+      probabilityNote: "来源已过期，暂不显示概率。",
       lastResetAt: lastResetAt,
       dataUpdatedAt: dataUpdatedAt,
       isStale: true,

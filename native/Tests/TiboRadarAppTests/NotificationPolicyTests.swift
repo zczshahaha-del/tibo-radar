@@ -6,21 +6,23 @@ import XCTest
 final class NotificationPolicyTests: XCTestCase {
   func testFirstRunIsSilent() {
     let decision = NotificationPolicy.decide(
-      previousProbability: nil,
+      previousSignal: nil,
       previousEventIDs: [],
-      snapshot: snapshot(probability: 80)
+      snapshot: snapshot(signal: .announced)
     )
     XCTAssertNil(decision)
   }
 
-  func testThresholdCrossingNotifies() {
+  func testStrongSignalCrossingNotifiesWithoutPercentage() {
     let decision = NotificationPolicy.decide(
-      previousProbability: 50,
+      previousSignal: .weak,
       previousEventIDs: [],
-      snapshot: snapshot(probability: 70)
+      snapshot: snapshot(signal: .strong)
     )
+
     XCTAssertNotNil(decision)
-    XCTAssertTrue(decision?.title.contains("70%") == true)
+    XCTAssertTrue(decision?.title.contains("值得关注") == true)
+    XCTAssertFalse(decision?.title.contains("%") == true)
   }
 
   func testKnownEventDoesNotNotifyAgain() {
@@ -33,30 +35,27 @@ final class NotificationPolicyTests: XCTestCase {
       state: nil
     )
     let decision = NotificationPolicy.decide(
-      previousProbability: 40,
+      previousSignal: SignalStrength.none,
       previousEventIDs: ["event-1"],
-      snapshot: snapshot(probability: 40, events: [event])
+      snapshot: snapshot(signal: .none, events: [event])
     )
     XCTAssertNil(decision)
   }
 
   private func snapshot(
-    probability: Int,
+    signal: SignalStrength,
     events: [RadarEvent] = []
   ) -> PredictionSnapshot {
     PredictionSnapshot(
       generatedAt: Date(timeIntervalSince1970: 0),
-      global24h: probability,
-      global48h: probability,
-      banked24h: 8,
-      banked48h: 15,
-      combined24h: probability,
-      combined48h: probability,
-      affectedUserBanked24h: nil,
-      confidence: "low",
-      confidenceNote: "test",
-      level: .green,
+      globalSignal: signal,
+      bankedSignal: .none,
+      affectedUserSignal: nil,
+      analysisNote: "test",
+      summary: "test",
       likelyWindow: "北京时间 07:00–10:00",
+      calibratedProbability: nil,
+      probabilityNote: "历史回测仍在实验中，暂不显示概率。",
       lastResetAt: nil,
       dataUpdatedAt: nil,
       isStale: false,
