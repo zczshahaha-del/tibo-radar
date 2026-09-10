@@ -22,7 +22,7 @@ struct AIAnalysis: Codable, Equatable, Sendable {
   let affectedUserBanked24h: ForecastProbabilityRange?
   let usageAdvice: UsageAdvice
   let analysisNote: String
-  let likelyWindow: String
+  let conditionalWindow: String
   let summary: String
   let evidence: [AIAnalysisEvidence]
 
@@ -36,13 +36,13 @@ struct AIAnalysis: Codable, Equatable, Sendable {
     case affectedUserBanked24h = "affected_user_banked_24h"
     case usageAdvice = "usage_advice"
     case analysisNote = "analysis_note"
-    case likelyWindow = "likely_window"
+    case conditionalWindow = "conditional_window"
     case summary, evidence
   }
 
   func validated() throws -> AIAnalysis {
     guard !analysisNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-      !likelyWindow.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      !conditionalWindow.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
       !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     else {
       throw AIProviderError.invalidAnalysis("模型结果缺少判断原因或时间窗口。")
@@ -71,7 +71,7 @@ struct AIAnalysis: Codable, Equatable, Sendable {
     try Self.validateCumulative(combined24h, combined48h, name: "combined")
     try Self.validateCombined(combined24h, global24h, banked24h, name: "combined_24h")
     try Self.validateCombined(combined48h, global48h, banked48h, name: "combined_48h")
-    let userFacingText = [analysisNote, likelyWindow, summary]
+    let userFacingText = [analysisNote, conditionalWindow, summary]
       + evidence.flatMap { [$0.label, $0.detail] }
     guard !userFacingText.contains(where: Self.containsPercentage) else {
       throw AIProviderError.invalidAnalysis("AI 返回了未经校准的百分比，已拒绝显示。")
@@ -112,7 +112,7 @@ struct AIAnalysis: Codable, Equatable, Sendable {
       usageAdvice: usageAdvice,
       analysisNote: stale ? "部分公开来源来自缓存。\(analysisNote)" : analysisNote,
       summary: summary,
-      likelyWindow: likelyWindow,
+      conditionalWindow: conditionalWindow,
       historicalBaseline: calibration.estimate,
       baselineNote: Self.baselineNote(calibration, stale: stale),
       lastResetAt: metadata.lastResetAt,

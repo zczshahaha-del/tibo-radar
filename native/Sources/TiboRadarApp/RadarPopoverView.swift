@@ -101,21 +101,28 @@ struct RadarPopoverView: View {
           Label("AI 综合预测", systemImage: "circle.fill")
             .font(.caption.weight(.semibold))
             .foregroundStyle(levelColor(snapshot.combined24h.likely))
-          Text(snapshot.combined24h.label)
+          Text("\(snapshot.combined24h.likely)%")
             .font(.system(size: 46, weight: .bold, design: .rounded))
             .minimumScaleFactor(0.75)
             .lineLimit(1)
           Text("未来 24 小时 · 两种福利至少一种")
             .font(.callout)
             .foregroundStyle(.secondary)
+          Text("可能范围 \(snapshot.combined24h.label)")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
         }
         Spacer()
         VStack(alignment: .leading, spacing: 12) {
-          metric("48 小时", snapshot.combined48h.label)
+          metric(
+            "48 小时",
+            "\(snapshot.combined48h.likely)%",
+            detail: "可能范围 \(snapshot.combined48h.label)"
+          )
           metric("现在怎么做", snapshot.usageAdvice.label)
           metric(
-            "最可能什么时候",
-            PredictionCopy.likelyTime(snapshot.likelyWindow),
+            "若发生，较可能在",
+            PredictionCopy.conditionalWindow(snapshot.conditionalWindow),
             lineLimit: 2
           )
         }
@@ -140,7 +147,8 @@ struct RadarPopoverView: View {
   private func metric(
     _ label: String,
     _ value: String,
-    lineLimit: Int = 1
+    lineLimit: Int = 1,
+    detail: String? = nil
   ) -> some View {
     VStack(alignment: .leading, spacing: 2) {
       Text(label.uppercased())
@@ -150,6 +158,13 @@ struct RadarPopoverView: View {
         .font(.system(size: 13, weight: .semibold, design: .rounded))
         .lineLimit(lineLimit)
         .minimumScaleFactor(0.75)
+      if let detail {
+        Text(detail)
+          .font(.system(size: 9, weight: .medium))
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .minimumScaleFactor(0.72)
+      }
     }
   }
 
@@ -158,14 +173,14 @@ struct RadarPopoverView: View {
       categoryRow(
         icon: "globe.asia.australia.fill",
         title: "全局重置",
-        value: snapshot.global24h.label,
+        range: snapshot.global24h,
         color: .green
       )
       Divider().padding(.leading, 46)
       categoryRow(
         icon: "creditcard.fill",
         title: "普发重置卡",
-        value: snapshot.banked24h.label,
+        range: snapshot.banked24h,
         color: .mint
       )
       if let affected = snapshot.affectedUserBanked24h {
@@ -173,7 +188,7 @@ struct RadarPopoverView: View {
         categoryRow(
           icon: "exclamationmark.triangle.fill",
           title: "故障补发",
-          value: affected.label,
+          range: affected,
           color: .orange,
           badge: "仅受影响用户"
         )
@@ -190,7 +205,7 @@ struct RadarPopoverView: View {
   private func categoryRow(
     icon: String,
     title: String,
-    value: String,
+    range: ForecastProbabilityRange,
     color: Color,
     badge: String? = nil
   ) -> some View {
@@ -211,8 +226,13 @@ struct RadarPopoverView: View {
         }
       }
       Spacer()
-      Text(value)
-        .font(.system(size: 14, weight: .bold))
+      VStack(alignment: .trailing, spacing: 1) {
+        Text("\(range.likely)%")
+          .font(.system(size: 14, weight: .bold))
+        Text("范围 \(range.label)")
+          .font(.system(size: 9, weight: .medium))
+          .foregroundStyle(.secondary)
+      }
     }
     .padding(.vertical, 11)
   }
@@ -220,7 +240,7 @@ struct RadarPopoverView: View {
   private func evidence(_ snapshot: PredictionSnapshot) -> some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
-        Text("AI 为什么给这个范围")
+        Text("AI 为什么这么预测")
           .font(.system(size: 12, weight: .bold))
         Spacer()
         if snapshot.isStale {

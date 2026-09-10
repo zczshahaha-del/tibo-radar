@@ -119,7 +119,7 @@ struct PredictionSnapshot: Codable, Equatable, Sendable {
   let usageAdvice: UsageAdvice
   let analysisNote: String
   let summary: String
-  let likelyWindow: String
+  let conditionalWindow: String
   let historicalBaseline: ProbabilityEstimate?
   let baselineNote: String
   let lastResetAt: Date?
@@ -145,7 +145,7 @@ extension PredictionSnapshot {
       usageAdvice: usageAdvice,
       analysisNote: reason,
       summary: summary,
-      likelyWindow: likelyWindow,
+      conditionalWindow: conditionalWindow,
       historicalBaseline: historicalBaseline,
       baselineNote: "来源已过期，当前显示上次 AI 预测。",
       lastResetAt: lastResetAt,

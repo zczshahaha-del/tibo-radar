@@ -27,7 +27,7 @@ final class VisualRenderTests: XCTestCase {
       usageAdvice: .watch,
       analysisNote: "AI 综合历史频率、近期言论和服务状态后，认为事件仍有可能发生，但没有明显升温。",
       summary: "有基础概率，可以关注，但还没到需要立刻改变用量安排的程度。",
-      likelyWindow: "北京时间 07:00–10:00",
+      conditionalWindow: "9月11日 07:00–10:00",
       historicalBaseline: ProbabilityEstimate(
         lower24h: 12,
         upper24h: 37,
@@ -133,7 +133,7 @@ final class VisualRenderTests: XCTestCase {
       usageAdvice: .watch,
       analysisNote: "AI evidence",
       summary: "No actionable signal",
-      likelyWindow: "无法可靠判断",
+      conditionalWindow: "暂无集中时段",
       historicalBaseline: ProbabilityEstimate(
         lower24h: 12,
         upper24h: 37,

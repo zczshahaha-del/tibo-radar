@@ -191,7 +191,7 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
         "affected_user_banked_24h": {"lower": 0到100整数, "likely": 0到100整数, "upper": 0到100整数}或null,
         "usage_advice": "normal、watch、accelerate或use_now",
         "analysis_note": "不超过55个中文字符，解释历史基准和近期证据怎样形成当前范围，不写百分比",
-        "likely_window": "只写简短北京时间，如9月11日 08:00–12:00；没有可靠时间必须写暂无可靠时间",
+        "conditional_window": "假设事件会在未来24小时发生，它相对更可能集中在哪个北京时间窗口；只写如9月11日 08:00–12:00，不得早于current_time；没有明显集中时段写暂无集中时段",
         "summary": "一句话预测结论，不重复数字",
         "evidence": [
           {

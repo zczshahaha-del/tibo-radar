@@ -22,6 +22,18 @@ final class NotificationPolicyTests: XCTestCase {
 
     XCTAssertNotNil(decision)
     XCTAssertTrue(decision?.title.contains("62–82%") == true)
+    XCTAssertTrue(decision?.body.contains("若发生，较可能在") == true)
+  }
+
+  func testUnknownWindowIsNotPresentedAsASchedule() {
+    let decision = NotificationPolicy.decide(
+      previousProbability: 42,
+      previousEventIDs: [],
+      snapshot: snapshot(likely: 72, conditionalWindow: "暂无集中时段")
+    )
+
+    XCTAssertTrue(decision?.body.contains("暂时没有明显集中的发生时段") == true)
+    XCTAssertFalse(decision?.body.contains("若发生，较可能在：暂无") == true)
   }
 
   func testKnownEventDoesNotNotifyAgain() {
@@ -43,6 +55,7 @@ final class NotificationPolicyTests: XCTestCase {
 
   private func snapshot(
     likely: Int,
+    conditionalWindow: String = "北京时间 07:00–10:00",
     events: [RadarEvent] = []
   ) -> PredictionSnapshot {
     PredictionSnapshot(
@@ -57,7 +70,7 @@ final class NotificationPolicyTests: XCTestCase {
       usageAdvice: .watch,
       analysisNote: "test",
       summary: "test",
-      likelyWindow: "北京时间 07:00–10:00",
+      conditionalWindow: conditionalWindow,
       historicalBaseline: nil,
       baselineNote: "没有拿到历史回放数据。",
       lastResetAt: nil,

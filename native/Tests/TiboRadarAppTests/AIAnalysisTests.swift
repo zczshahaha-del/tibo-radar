@@ -31,7 +31,7 @@ final class AIAnalysisTests: XCTestCase {
       affectedUserBanked24h: nil,
       usageAdvice: .normal,
       analysisNote: "没有新言论，但仍存在历史基础概率。",
-      likelyWindow: "暂无可靠时间",
+      conditionalWindow: "暂无集中时段",
       summary: "短期可能性偏低但不为零。",
       evidence: []
     )
@@ -51,7 +51,7 @@ final class AIAnalysisTests: XCTestCase {
       affectedUserBanked24h: nil,
       usageAdvice: .watch,
       analysisNote: base.analysisNote,
-      likelyWindow: base.likelyWindow,
+      conditionalWindow: base.conditionalWindow,
       summary: base.summary,
       evidence: []
     )
@@ -71,7 +71,7 @@ final class AIAnalysisTests: XCTestCase {
       affectedUserBanked24h: nil,
       usageAdvice: .watch,
       analysisNote: "我主观认为有 30% 的可能",
-      likelyWindow: base.likelyWindow,
+      conditionalWindow: base.conditionalWindow,
       summary: base.summary,
       evidence: []
     )
@@ -103,7 +103,7 @@ final class AIAnalysisTests: XCTestCase {
       affectedUserBanked24h: range(60, 80, 95),
       usageAdvice: .watch,
       analysisNote: "历史基准偏低，近期只有间接暗示，因此范围保持较宽。",
-      likelyWindow: "暂无可靠时间",
+      conditionalWindow: "暂无集中时段",
       summary: "未来两天仍可能突发重置，但目前没有明确预告。",
       evidence: [
         AIAnalysisEvidence(

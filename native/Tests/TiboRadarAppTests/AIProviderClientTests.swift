@@ -63,6 +63,8 @@ final class AIProviderClientTests: XCTestCase {
     XCTAssertEqual(analysis.combined24h, ForecastProbabilityRange(lower: 14, likely: 24, upper: 38))
     let requestText = String(data: capturedBody ?? Data(), encoding: .utf8) ?? ""
     XCTAssertTrue(requestText.contains("global_24h"))
+    XCTAssertTrue(requestText.contains("conditional_window"))
+    XCTAssertFalse(requestText.contains("\"likely_window\""))
     XCTAssertTrue(requestText.contains("你必须每次都预测"))
     XCTAssertTrue(requestText.contains("没有新信号时，概率应保留在合理的历史基准附近"))
   }
@@ -135,7 +137,7 @@ final class AIProviderClientTests: XCTestCase {
       "affected_user_banked_24h": NSNull(),
       "usage_advice": "watch",
       "analysis_note": "只有间接暗示，没有明确预告",
-      "likely_window": "若发生，较可能落在北京时间早间",
+      "conditional_window": "北京时间早间",
       "summary": "历史基准仍支持事件可能发生，近期言论没有明显抬高判断",
       "evidence": [],
     ]

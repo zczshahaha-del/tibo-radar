@@ -30,9 +30,13 @@ enum NotificationPolicy {
       snapshot.combined24h.likely >= threshold
     {
       let reason = snapshot.evidence.first?.detail ?? snapshot.analysisNote
+      let window = PredictionCopy.conditionalWindow(snapshot.conditionalWindow)
+      let timeCopy = window == "暂无集中时段"
+        ? "暂时没有明显集中的发生时段。"
+        : "若发生，较可能在：\(window)"
       return NotificationDecision(
         title: "Tibo Radar：24 小时预测升至 \(snapshot.combined24h.label)",
-        body: "\(reason) 最可能时段：\(snapshot.likelyWindow)"
+        body: "\(reason) \(timeCopy)"
       )
     }
     return nil

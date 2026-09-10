@@ -33,7 +33,7 @@ final class AISnapshotStoreTests: XCTestCase {
       usageAdvice: .watch,
       analysisNote: "test",
       summary: "test",
-      likelyWindow: "test",
+      conditionalWindow: "暂无集中时段",
       historicalBaseline: ProbabilityEstimate(
         lower24h: 12,
         upper24h: 37,
