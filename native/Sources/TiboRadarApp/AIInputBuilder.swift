@@ -24,7 +24,10 @@ enum AIInputBuilder {
 
     if let forecast = bundle.payloads[.forecast]?.objectValue {
       context["historical_baseline"] = jsonObject(
-        selecting: ["last_reset_at", "age_days", "cadence", "time_window"],
+        selecting: [
+          "last_reset_at", "age_days", "cadence", "time_window", "probabilities",
+          "backtest", "model", "wait_comparison",
+        ],
         from: forecast
       )
     }

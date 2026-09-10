@@ -98,30 +98,21 @@ struct RadarPopoverView: View {
     VStack(spacing: 12) {
       HStack(alignment: .firstTextBaseline) {
         VStack(alignment: .leading, spacing: 6) {
-          Label(snapshot.overallSignal.label, systemImage: "circle.fill")
+          Label("AI 综合预测", systemImage: "circle.fill")
             .font(.caption.weight(.semibold))
-            .foregroundStyle(levelColor(snapshot.overallSignal))
-          Text(snapshot.probabilityEstimate?.label24h ?? "暂无估计")
-            .font(
-              .system(
-                size: snapshot.probabilityEstimate == nil ? 27 : 46,
-                weight: .bold,
-                design: .rounded
-              )
-            )
+            .foregroundStyle(levelColor(snapshot.combined24h.likely))
+          Text(snapshot.combined24h.label)
+            .font(.system(size: 46, weight: .bold, design: .rounded))
             .minimumScaleFactor(0.75)
             .lineLimit(1)
-          Text(
-            "未来 24 小时"
-              + (snapshot.probabilityEstimate.map { " · \($0.quality.label)" } ?? "")
-          )
+          Text("未来 24 小时 · 两种福利至少一种")
             .font(.callout)
             .foregroundStyle(.secondary)
         }
         Spacer()
         VStack(alignment: .leading, spacing: 12) {
-          metric("48 小时", snapshot.probabilityEstimate?.label48h ?? "暂无")
-          metric("现在怎么做", snapshot.overallSignal.action)
+          metric("48 小时", snapshot.combined48h.label)
+          metric("现在怎么做", snapshot.usageAdvice.label)
           metric(
             "最可能什么时候",
             PredictionCopy.likelyTime(snapshot.likelyWindow),
@@ -134,7 +125,7 @@ struct RadarPopoverView: View {
     .padding(18)
     .background(
       LinearGradient(
-        colors: [levelColor(snapshot.overallSignal).opacity(0.16), .black.opacity(0.03)],
+        colors: [levelColor(snapshot.combined24h.likely).opacity(0.16), .black.opacity(0.03)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
       ),
@@ -142,7 +133,7 @@ struct RadarPopoverView: View {
     )
     .overlay {
       RoundedRectangle(cornerRadius: 17)
-        .stroke(levelColor(snapshot.overallSignal).opacity(0.32), lineWidth: 1)
+        .stroke(levelColor(snapshot.combined24h.likely).opacity(0.32), lineWidth: 1)
     }
   }
 
@@ -167,17 +158,17 @@ struct RadarPopoverView: View {
       categoryRow(
         icon: "globe.asia.australia.fill",
         title: "全局重置",
-        value: snapshot.globalSignal.label,
+        value: snapshot.global24h.label,
         color: .green
       )
       Divider().padding(.leading, 46)
       categoryRow(
         icon: "creditcard.fill",
         title: "普发重置卡",
-        value: snapshot.bankedSignal.label,
+        value: snapshot.banked24h.label,
         color: .mint
       )
-      if let affected = snapshot.affectedUserSignal, affected != .none {
+      if let affected = snapshot.affectedUserBanked24h {
         Divider().padding(.leading, 46)
         categoryRow(
           icon: "exclamationmark.triangle.fill",
@@ -229,7 +220,7 @@ struct RadarPopoverView: View {
   private func evidence(_ snapshot: PredictionSnapshot) -> some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
-        Text("AI 为什么这么判断")
+        Text("AI 为什么给这个范围")
           .font(.system(size: 12, weight: .bold))
         Spacer()
         if snapshot.isStale {
@@ -248,10 +239,10 @@ struct RadarPopoverView: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 3) {
-        Text(snapshot.probabilityEstimate == nil ? "为什么没有估计" : "概率范围怎样得出")
+        Text("AI 参考了什么")
           .font(.system(size: 10, weight: .semibold))
           .foregroundStyle(.tertiary)
-        Text(snapshot.probabilityNote)
+        Text(snapshot.baselineNote)
           .font(.system(size: 10))
           .foregroundStyle(.secondary)
           .lineLimit(2)
@@ -370,13 +361,11 @@ struct RadarPopoverView: View {
     return "AI 信号判断已启用"
   }
 
-  private func levelColor(_ level: SignalStrength) -> Color {
-    switch level {
-    case .none: .green
-    case .weak: .yellow
-    case .strong: .orange
-    case .announced: .red
-    }
+  private func levelColor(_ probability: Int) -> Color {
+    if probability >= 70 { return .red }
+    if probability >= 50 { return .orange }
+    if probability >= 30 { return .yellow }
+    return .green
   }
 
   private func evidenceColor(_ category: String) -> Color {

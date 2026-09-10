@@ -58,38 +58,28 @@ struct RadarEvent: Identifiable, Codable, Equatable, Sendable {
   let state: String?
 }
 
-enum SignalStrength: String, Codable, Equatable, Sendable {
-  case none
-  case weak
-  case strong
-  case announced
+enum UsageAdvice: String, Codable, Equatable, Sendable {
+  case normal
+  case watch
+  case accelerate
+  case useNow = "use_now"
 
   var label: String {
     switch self {
-    case .none: "没有新信号"
-    case .weak: "有一点迹象"
-    case .strong: "值得关注"
-    case .announced: "已有明确预告"
+    case .normal: "正常使用"
+    case .watch: "开始关注"
+    case .accelerate: "可以加速使用"
+    case .useNow: "尽快使用"
     }
   }
+}
 
-  var action: String {
-    switch self {
-    case .none: "正常使用"
-    case .weak: "先观察"
-    case .strong: "可以加速使用"
-    case .announced: "尽快使用"
-    }
-  }
+struct ForecastProbabilityRange: Codable, Equatable, Sendable {
+  let lower: Int
+  let likely: Int
+  let upper: Int
 
-  var rank: Int {
-    switch self {
-    case .none: 0
-    case .weak: 1
-    case .strong: 2
-    case .announced: 3
-    }
-  }
+  var label: String { "\(lower)–\(upper)%" }
 }
 
 enum ProbabilityQuality: String, Codable, Equatable, Sendable {
@@ -119,14 +109,19 @@ struct ProbabilityEstimate: Codable, Equatable, Sendable {
 
 struct PredictionSnapshot: Codable, Equatable, Sendable {
   let generatedAt: Date
-  let globalSignal: SignalStrength
-  let bankedSignal: SignalStrength
-  let affectedUserSignal: SignalStrength?
+  let global24h: ForecastProbabilityRange
+  let global48h: ForecastProbabilityRange
+  let banked24h: ForecastProbabilityRange
+  let banked48h: ForecastProbabilityRange
+  let combined24h: ForecastProbabilityRange
+  let combined48h: ForecastProbabilityRange
+  let affectedUserBanked24h: ForecastProbabilityRange?
+  let usageAdvice: UsageAdvice
   let analysisNote: String
   let summary: String
   let likelyWindow: String
-  let probabilityEstimate: ProbabilityEstimate?
-  let probabilityNote: String
+  let historicalBaseline: ProbabilityEstimate?
+  let baselineNote: String
   let lastResetAt: Date?
   let dataUpdatedAt: Date?
   let isStale: Bool
@@ -134,23 +129,25 @@ struct PredictionSnapshot: Codable, Equatable, Sendable {
   let latestEvents: [RadarEvent]
   let sourceErrors: [String]
 
-  var overallSignal: SignalStrength {
-    [globalSignal, bankedSignal].max { $0.rank < $1.rank } ?? .none
-  }
 }
 
 extension PredictionSnapshot {
   func markedStale(reason: String) -> PredictionSnapshot {
     PredictionSnapshot(
       generatedAt: generatedAt,
-      globalSignal: globalSignal,
-      bankedSignal: bankedSignal,
-      affectedUserSignal: affectedUserSignal,
+      global24h: global24h,
+      global48h: global48h,
+      banked24h: banked24h,
+      banked48h: banked48h,
+      combined24h: combined24h,
+      combined48h: combined48h,
+      affectedUserBanked24h: affectedUserBanked24h,
+      usageAdvice: usageAdvice,
       analysisNote: reason,
       summary: summary,
       likelyWindow: likelyWindow,
-      probabilityEstimate: nil,
-      probabilityNote: "来源已过期，暂不显示估计。",
+      historicalBaseline: historicalBaseline,
+      baselineNote: "来源已过期，当前显示上次 AI 预测。",
       lastResetAt: lastResetAt,
       dataUpdatedAt: dataUpdatedAt,
       isStale: true,

@@ -23,13 +23,18 @@ final class AISnapshotStoreTests: XCTestCase {
   private func makeSnapshot() -> PredictionSnapshot {
     PredictionSnapshot(
       generatedAt: Date(timeIntervalSince1970: 1),
-      globalSignal: .weak,
-      bankedSignal: .none,
-      affectedUserSignal: nil,
+      global24h: ForecastProbabilityRange(lower: 8, likely: 15, upper: 25),
+      global48h: ForecastProbabilityRange(lower: 15, likely: 28, upper: 42),
+      banked24h: ForecastProbabilityRange(lower: 4, likely: 8, upper: 14),
+      banked48h: ForecastProbabilityRange(lower: 8, likely: 16, upper: 26),
+      combined24h: ForecastProbabilityRange(lower: 10, likely: 21, upper: 32),
+      combined48h: ForecastProbabilityRange(lower: 19, likely: 38, upper: 55),
+      affectedUserBanked24h: nil,
+      usageAdvice: .watch,
       analysisNote: "test",
       summary: "test",
       likelyWindow: "test",
-      probabilityEstimate: ProbabilityEstimate(
+      historicalBaseline: ProbabilityEstimate(
         lower24h: 12,
         upper24h: 37,
         lower48h: 25,
@@ -38,7 +43,7 @@ final class AISnapshotStoreTests: XCTestCase {
         brierScore: 0.106,
         quality: .historicalEstimate
       ),
-      probabilityNote: "回放了 307 个过去时段，和旧模型接近；AI 新线索单独显示。",
+      baselineNote: "AI 参考历史基准：24 小时 12–37%，48 小时 25–55%，共 307 个回放时段。",
       lastResetAt: nil,
       dataUpdatedAt: nil,
       isStale: false,

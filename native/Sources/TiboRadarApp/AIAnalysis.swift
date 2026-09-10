@@ -13,18 +13,28 @@ struct AIAnalysisEvidence: Codable, Equatable, Sendable {
 }
 
 struct AIAnalysis: Codable, Equatable, Sendable {
-  let globalSignal: SignalStrength
-  let bankedSignal: SignalStrength
-  let affectedUserSignal: SignalStrength?
+  let global24h: ForecastProbabilityRange
+  let global48h: ForecastProbabilityRange
+  let banked24h: ForecastProbabilityRange
+  let banked48h: ForecastProbabilityRange
+  let combined24h: ForecastProbabilityRange
+  let combined48h: ForecastProbabilityRange
+  let affectedUserBanked24h: ForecastProbabilityRange?
+  let usageAdvice: UsageAdvice
   let analysisNote: String
   let likelyWindow: String
   let summary: String
   let evidence: [AIAnalysisEvidence]
 
   enum CodingKeys: String, CodingKey {
-    case globalSignal = "global_signal"
-    case bankedSignal = "banked_signal"
-    case affectedUserSignal = "affected_user_signal"
+    case global24h = "global_24h"
+    case global48h = "global_48h"
+    case banked24h = "banked_24h"
+    case banked48h = "banked_48h"
+    case combined24h = "combined_24h"
+    case combined48h = "combined_48h"
+    case affectedUserBanked24h = "affected_user_banked_24h"
+    case usageAdvice = "usage_advice"
     case analysisNote = "analysis_note"
     case likelyWindow = "likely_window"
     case summary, evidence
@@ -37,6 +47,30 @@ struct AIAnalysis: Codable, Equatable, Sendable {
     else {
       throw AIProviderError.invalidAnalysis("模型结果缺少判断原因或时间窗口。")
     }
+    let requiredRanges = [
+      ("global_24h", global24h),
+      ("global_48h", global48h),
+      ("banked_24h", banked24h),
+      ("banked_48h", banked48h),
+      ("combined_24h", combined24h),
+      ("combined_48h", combined48h),
+    ]
+    for (name, range) in requiredRanges {
+      try Self.validate(range, name: name, lowerBound: 1, upperBound: 99)
+    }
+    if let affectedUserBanked24h {
+      try Self.validate(
+        affectedUserBanked24h,
+        name: "affected_user_banked_24h",
+        lowerBound: 0,
+        upperBound: 100
+      )
+    }
+    try Self.validateCumulative(global24h, global48h, name: "global")
+    try Self.validateCumulative(banked24h, banked48h, name: "banked")
+    try Self.validateCumulative(combined24h, combined48h, name: "combined")
+    try Self.validateCombined(combined24h, global24h, banked24h, name: "combined_24h")
+    try Self.validateCombined(combined48h, global48h, banked48h, name: "combined_48h")
     let userFacingText = [analysisNote, likelyWindow, summary]
       + evidence.flatMap { [$0.label, $0.detail] }
     guard !userFacingText.contains(where: Self.containsPercentage) else {
@@ -68,14 +102,19 @@ struct AIAnalysis: Codable, Equatable, Sendable {
 
     return PredictionSnapshot(
       generatedAt: now,
-      globalSignal: globalSignal,
-      bankedSignal: bankedSignal,
-      affectedUserSignal: affectedUserSignal,
+      global24h: global24h,
+      global48h: global48h,
+      banked24h: banked24h,
+      banked48h: banked48h,
+      combined24h: combined24h,
+      combined48h: combined48h,
+      affectedUserBanked24h: affectedUserBanked24h,
+      usageAdvice: usageAdvice,
       analysisNote: stale ? "部分公开来源来自缓存。\(analysisNote)" : analysisNote,
       summary: summary,
       likelyWindow: likelyWindow,
-      probabilityEstimate: stale ? nil : calibration.estimate,
-      probabilityNote: stale ? "来源已过期，暂不显示估计。" : calibration.note,
+      historicalBaseline: calibration.estimate,
+      baselineNote: Self.baselineNote(calibration, stale: stale),
       lastResetAt: metadata.lastResetAt,
       dataUpdatedAt: metadata.dataUpdatedAt,
       isStale: stale,
@@ -95,6 +134,62 @@ struct AIAnalysis: Codable, Equatable, Sendable {
 
   private static func containsPercentage(_ value: String) -> Bool {
     value.contains("%") || value.contains("％") || value.contains("百分之")
+  }
+
+  private static func validate(
+    _ range: ForecastProbabilityRange,
+    name: String,
+    lowerBound: Int,
+    upperBound: Int
+  ) throws {
+    guard (lowerBound...upperBound).contains(range.lower),
+      (lowerBound...upperBound).contains(range.likely),
+      (lowerBound...upperBound).contains(range.upper),
+      range.lower <= range.likely,
+      range.likely <= range.upper
+    else {
+      throw AIProviderError.invalidAnalysis("AI 返回的 \(name) 概率范围无效。")
+    }
+  }
+
+  private static func validateCumulative(
+    _ first24h: ForecastProbabilityRange,
+    _ first48h: ForecastProbabilityRange,
+    name: String
+  ) throws {
+    guard first48h.lower >= first24h.lower,
+      first48h.likely >= first24h.likely,
+      first48h.upper >= first24h.upper
+    else {
+      throw AIProviderError.invalidAnalysis("AI 返回的 \(name) 48 小时概率低于 24 小时。")
+    }
+  }
+
+  private static func validateCombined(
+    _ combined: ForecastProbabilityRange,
+    _ global: ForecastProbabilityRange,
+    _ banked: ForecastProbabilityRange,
+    name: String
+  ) throws {
+    guard combined.lower >= max(global.lower, banked.lower),
+      combined.likely >= max(global.likely, banked.likely),
+      combined.upper >= max(global.upper, banked.upper)
+    else {
+      throw AIProviderError.invalidAnalysis("AI 返回的 \(name) 综合概率低于分类概率。")
+    }
+  }
+
+  private static func baselineNote(
+    _ calibration: ProbabilityCalibrationResult,
+    stale: Bool
+  ) -> String {
+    let freshness = stale ? "公开来源部分过期。" : ""
+    guard let estimate = calibration.estimate else {
+      return freshness + calibration.note
+    }
+    return freshness
+      + "AI 参考历史基准：24 小时 \(estimate.label24h)，48 小时 \(estimate.label48h)，"
+      + "共 \(estimate.sampleSize) 个回放时段。"
   }
 }
 

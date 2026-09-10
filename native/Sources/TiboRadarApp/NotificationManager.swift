@@ -8,11 +8,12 @@ struct NotificationDecision: Equatable, Sendable {
 
 enum NotificationPolicy {
   static func decide(
-    previousSignal: SignalStrength?,
+    previousProbability: Int?,
     previousEventIDs: Set<String>,
-    snapshot: PredictionSnapshot
+    snapshot: PredictionSnapshot,
+    threshold: Int = 65
   ) -> NotificationDecision? {
-    guard let previousSignal else { return nil }
+    guard let previousProbability else { return nil }
 
     let newEvent = snapshot.latestEvents.first { event in
       !previousEventIDs.contains(event.id)
@@ -25,14 +26,12 @@ enum NotificationPolicy {
       )
     }
 
-    if previousSignal.rank < SignalStrength.strong.rank,
-      snapshot.overallSignal.rank >= SignalStrength.strong.rank
+    if previousProbability < threshold,
+      snapshot.combined24h.likely >= threshold
     {
       let reason = snapshot.evidence.first?.detail ?? snapshot.analysisNote
       return NotificationDecision(
-        title: snapshot.overallSignal == .announced
-          ? "Tibo Radar：发现明确预告"
-          : "Tibo Radar：发现值得关注的信号",
+        title: "Tibo Radar：24 小时预测升至 \(snapshot.combined24h.label)",
         body: "\(reason) 最可能时段：\(snapshot.likelyWindow)"
       )
     }
@@ -53,19 +52,19 @@ actor NotificationManager {
     )
   }
 
-  func process(_ snapshot: PredictionSnapshot) async {
-    let previousSignal = defaults.string(forKey: "previousSignalStrength")
-      .flatMap(SignalStrength.init(rawValue:))
+  func process(_ snapshot: PredictionSnapshot, threshold: Int = 65) async {
+    let previousProbability = defaults.object(forKey: "previousAICombined24h") as? Int
     let previousEventIDs = Set(
       defaults.stringArray(forKey: "previousEventIDs") ?? []
     )
     let decision = NotificationPolicy.decide(
-      previousSignal: previousSignal,
+      previousProbability: previousProbability,
       previousEventIDs: previousEventIDs,
-      snapshot: snapshot
+      snapshot: snapshot,
+      threshold: threshold
     )
 
-    defaults.set(snapshot.overallSignal.rawValue, forKey: "previousSignalStrength")
+    defaults.set(snapshot.combined24h.likely, forKey: "previousAICombined24h")
     defaults.set(snapshot.latestEvents.map(\.id), forKey: "previousEventIDs")
 
     guard let decision else { return }

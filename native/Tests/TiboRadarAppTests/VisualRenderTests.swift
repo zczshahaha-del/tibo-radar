@@ -17,13 +17,18 @@ final class VisualRenderTests: XCTestCase {
 
     let snapshot = PredictionSnapshot(
       generatedAt: Date(),
-      globalSignal: .weak,
-      bankedSignal: .none,
-      affectedUserSignal: .announced,
-      analysisNote: "AI 找到一条暗示，但没有明确的未来承诺。",
-      summary: "先观察，不需要因为一个猜测改变用量安排。",
+      global24h: ForecastProbabilityRange(lower: 8, likely: 15, upper: 25),
+      global48h: ForecastProbabilityRange(lower: 15, likely: 28, upper: 42),
+      banked24h: ForecastProbabilityRange(lower: 4, likely: 8, upper: 14),
+      banked48h: ForecastProbabilityRange(lower: 8, likely: 16, upper: 26),
+      combined24h: ForecastProbabilityRange(lower: 10, likely: 21, upper: 32),
+      combined48h: ForecastProbabilityRange(lower: 19, likely: 38, upper: 55),
+      affectedUserBanked24h: ForecastProbabilityRange(lower: 60, likely: 80, upper: 95),
+      usageAdvice: .watch,
+      analysisNote: "AI 综合历史频率、近期言论和服务状态后，认为事件仍有可能发生，但没有明显升温。",
+      summary: "有基础概率，可以关注，但还没到需要立刻改变用量安排的程度。",
       likelyWindow: "北京时间 07:00–10:00",
-      probabilityEstimate: ProbabilityEstimate(
+      historicalBaseline: ProbabilityEstimate(
         lower24h: 12,
         upper24h: 37,
         lower48h: 25,
@@ -32,7 +37,7 @@ final class VisualRenderTests: XCTestCase {
         brierScore: 0.106,
         quality: .historicalEstimate
       ),
-      probabilityNote: "回放了 307 个过去时段，和旧模型接近；AI 新线索单独显示。",
+      baselineNote: "AI 参考历史基准：24 小时 12–37%，48 小时 25–55%，共 307 个回放时段。",
       lastResetAt: Date().addingTimeInterval(-2.2 * 86_400),
       dataUpdatedAt: Date(),
       isStale: false,
@@ -118,13 +123,18 @@ final class VisualRenderTests: XCTestCase {
   private func previewSnapshot() -> PredictionSnapshot {
     PredictionSnapshot(
       generatedAt: Date(),
-      globalSignal: .weak,
-      bankedSignal: .none,
-      affectedUserSignal: nil,
+      global24h: ForecastProbabilityRange(lower: 8, likely: 15, upper: 25),
+      global48h: ForecastProbabilityRange(lower: 15, likely: 28, upper: 42),
+      banked24h: ForecastProbabilityRange(lower: 4, likely: 8, upper: 14),
+      banked48h: ForecastProbabilityRange(lower: 8, likely: 16, upper: 26),
+      combined24h: ForecastProbabilityRange(lower: 10, likely: 21, upper: 32),
+      combined48h: ForecastProbabilityRange(lower: 19, likely: 38, upper: 55),
+      affectedUserBanked24h: nil,
+      usageAdvice: .watch,
       analysisNote: "AI evidence",
       summary: "No actionable signal",
       likelyWindow: "无法可靠判断",
-      probabilityEstimate: ProbabilityEstimate(
+      historicalBaseline: ProbabilityEstimate(
         lower24h: 12,
         upper24h: 37,
         lower48h: 25,
@@ -133,7 +143,7 @@ final class VisualRenderTests: XCTestCase {
         brierScore: 0.106,
         quality: .historicalEstimate
       ),
-      probabilityNote: "回放了 307 个过去时段，和旧模型接近；AI 新线索单独显示。",
+      baselineNote: "AI 参考历史基准：24 小时 12–37%，48 小时 25–55%，共 307 个回放时段。",
       lastResetAt: nil,
       dataUpdatedAt: Date(),
       isStale: false,

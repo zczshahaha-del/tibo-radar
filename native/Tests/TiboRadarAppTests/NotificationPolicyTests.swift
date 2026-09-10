@@ -6,23 +6,22 @@ import XCTest
 final class NotificationPolicyTests: XCTestCase {
   func testFirstRunIsSilent() {
     let decision = NotificationPolicy.decide(
-      previousSignal: nil,
+      previousProbability: nil,
       previousEventIDs: [],
-      snapshot: snapshot(signal: .announced)
+      snapshot: snapshot(likely: 80)
     )
     XCTAssertNil(decision)
   }
 
-  func testStrongSignalCrossingNotifiesWithoutPercentage() {
+  func testProbabilityThresholdCrossingNotifiesWithRange() {
     let decision = NotificationPolicy.decide(
-      previousSignal: .weak,
+      previousProbability: 42,
       previousEventIDs: [],
-      snapshot: snapshot(signal: .strong)
+      snapshot: snapshot(likely: 72)
     )
 
     XCTAssertNotNil(decision)
-    XCTAssertTrue(decision?.title.contains("值得关注") == true)
-    XCTAssertFalse(decision?.title.contains("%") == true)
+    XCTAssertTrue(decision?.title.contains("62–82%") == true)
   }
 
   func testKnownEventDoesNotNotifyAgain() {
@@ -35,27 +34,32 @@ final class NotificationPolicyTests: XCTestCase {
       state: nil
     )
     let decision = NotificationPolicy.decide(
-      previousSignal: SignalStrength.none,
+      previousProbability: 15,
       previousEventIDs: ["event-1"],
-      snapshot: snapshot(signal: .none, events: [event])
+      snapshot: snapshot(likely: 15, events: [event])
     )
     XCTAssertNil(decision)
   }
 
   private func snapshot(
-    signal: SignalStrength,
+    likely: Int,
     events: [RadarEvent] = []
   ) -> PredictionSnapshot {
     PredictionSnapshot(
       generatedAt: Date(timeIntervalSince1970: 0),
-      globalSignal: signal,
-      bankedSignal: .none,
-      affectedUserSignal: nil,
+      global24h: ForecastProbabilityRange(lower: 8, likely: max(8, likely - 8), upper: max(18, likely + 5)),
+      global48h: ForecastProbabilityRange(lower: 15, likely: max(15, likely), upper: max(30, likely + 12)),
+      banked24h: ForecastProbabilityRange(lower: 4, likely: 7, upper: 12),
+      banked48h: ForecastProbabilityRange(lower: 8, likely: 14, upper: 24),
+      combined24h: ForecastProbabilityRange(lower: max(10, likely - 10), likely: likely, upper: max(20, likely + 10)),
+      combined48h: ForecastProbabilityRange(lower: max(18, likely), likely: max(30, likely + 10), upper: max(40, likely + 18)),
+      affectedUserBanked24h: nil,
+      usageAdvice: .watch,
       analysisNote: "test",
       summary: "test",
       likelyWindow: "北京时间 07:00–10:00",
-      probabilityEstimate: nil,
-      probabilityNote: "没有拿到历史回放数据，所以暂时无法估计。",
+      historicalBaseline: nil,
+      baselineNote: "没有拿到历史回放数据。",
       lastResetAt: nil,
       dataUpdatedAt: nil,
       isStale: false,

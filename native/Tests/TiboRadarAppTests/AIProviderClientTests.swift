@@ -59,10 +59,12 @@ final class AIProviderClientTests: XCTestCase {
     XCTAssertEqual(body["model"] as? String, "qwen-plus")
     XCTAssertEqual(body["temperature"] as? Int, 0)
     XCTAssertFalse(String(data: capturedBody ?? Data(), encoding: .utf8)?.contains("test-qwen-key") == true)
-    XCTAssertEqual(analysis.globalSignal, .weak)
+    XCTAssertEqual(analysis.global24h.likely, 18)
+    XCTAssertEqual(analysis.combined24h, ForecastProbabilityRange(lower: 14, likely: 24, upper: 38))
     let requestText = String(data: capturedBody ?? Data(), encoding: .utf8) ?? ""
-    XCTAssertFalse(requestText.contains("global_24h"))
-    XCTAssertTrue(requestText.contains("不得估算或输出任何百分比"))
+    XCTAssertTrue(requestText.contains("global_24h"))
+    XCTAssertTrue(requestText.contains("你必须每次都预测"))
+    XCTAssertTrue(requestText.contains("没有新信号时，概率应保留在合理的历史基准附近"))
   }
 
   func testDeepSeekUsesCollectedSourcesWithoutClaimingSearch() async throws {
@@ -124,12 +126,17 @@ final class AIProviderClientTests: XCTestCase {
 
   private static func successBody() -> Data {
     let analysis: [String: Any] = [
-      "global_signal": "weak",
-      "banked_signal": "none",
-      "affected_user_signal": NSNull(),
+      "global_24h": ["lower": 10, "likely": 18, "upper": 30],
+      "global_48h": ["lower": 20, "likely": 34, "upper": 49],
+      "banked_24h": ["lower": 5, "likely": 9, "upper": 17],
+      "banked_48h": ["lower": 10, "likely": 18, "upper": 31],
+      "combined_24h": ["lower": 14, "likely": 24, "upper": 38],
+      "combined_48h": ["lower": 27, "likely": 43, "upper": 60],
+      "affected_user_banked_24h": NSNull(),
+      "usage_advice": "watch",
       "analysis_note": "只有间接暗示，没有明确预告",
-      "likely_window": "无法可靠判断",
-      "summary": "目前没有明确预告",
+      "likely_window": "若发生，较可能落在北京时间早间",
+      "summary": "历史基准仍支持事件可能发生，近期言论没有明显抬高判断",
       "evidence": [],
     ]
     let analysisData = try! JSONSerialization.data(withJSONObject: analysis)
