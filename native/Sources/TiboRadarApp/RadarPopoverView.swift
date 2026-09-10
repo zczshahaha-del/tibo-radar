@@ -1,0 +1,309 @@
+import AppKit
+import SwiftUI
+
+struct RadarPopoverView: View {
+    @EnvironmentObject private var model: RadarViewModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+                .padding(.bottom, 14)
+
+            if let snapshot = model.snapshot {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        hero(snapshot)
+                        categories(snapshot)
+                        evidence(snapshot)
+                        if !snapshot.sourceErrors.isEmpty {
+                            sourceWarning(snapshot)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 14)
+                }
+            } else {
+                loading
+            }
+
+            footer
+                .padding(.horizontal, 20)
+                .padding(.vertical, 13)
+                .background(.black.opacity(0.12))
+        }
+        .frame(width: 390, height: 610)
+        .background(.ultraThinMaterial)
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(Color.green.opacity(0.14))
+                Image(systemName: "dot.radiowaves.up.forward")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.green)
+            }
+            .frame(width: 34, height: 34)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Tibo Radar")
+                    .font(.system(size: 17, weight: .bold))
+                HStack(spacing: 5) {
+                    Circle().fill(Color.green).frame(width: 6, height: 6)
+                    Text(model.isRefreshing ? "正在刷新" : "运行中")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button {
+                Task { await model.refresh() }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 14, weight: .semibold))
+                    .rotationEffect(model.isRefreshing ? .degrees(180) : .zero)
+            }
+            .buttonStyle(.plain)
+            .disabled(model.isRefreshing)
+            .help("刷新公开信号")
+            .accessibilityLabel("刷新公开信号")
+        }
+    }
+
+    private func hero(_ snapshot: PredictionSnapshot) -> some View {
+        VStack(spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(snapshot.level.label, systemImage: "circle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(levelColor(snapshot.level))
+                    HStack(alignment: .lastTextBaseline, spacing: 2) {
+                        Text("\(snapshot.combined24h)")
+                            .font(.system(size: 62, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                        Text("%")
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(levelColor(snapshot.level))
+                    }
+                    Text("未来 24 小时综合概率")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                VStack(alignment: .leading, spacing: 12) {
+                    metric("48 小时", "\(snapshot.combined48h)%")
+                    metric("高发时段", snapshot.likelyWindow.replacingOccurrences(
+                        of: "北京时间 ", with: ""
+                    ))
+                    metric("置信度", snapshot.confidence)
+                }
+                .frame(width: 112, alignment: .leading)
+            }
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [levelColor(snapshot.level).opacity(0.16), .black.opacity(0.03)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 17)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 17)
+                .stroke(levelColor(snapshot.level).opacity(0.32), lineWidth: 1)
+        }
+    }
+
+    private func metric(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+    }
+
+    private func categories(_ snapshot: PredictionSnapshot) -> some View {
+        VStack(spacing: 0) {
+            categoryRow(
+                icon: "globe.asia.australia.fill",
+                title: "全局重置",
+                value: snapshot.global24h,
+                color: .green
+            )
+            Divider().padding(.leading, 46)
+            categoryRow(
+                icon: "creditcard.fill",
+                title: "普发重置卡",
+                value: snapshot.banked24h,
+                color: .mint
+            )
+            if let affected = snapshot.affectedUserBanked24h {
+                Divider().padding(.leading, 46)
+                categoryRow(
+                    icon: "exclamationmark.triangle.fill",
+                    title: "故障补发",
+                    value: affected,
+                    color: .orange,
+                    badge: "仅受影响用户"
+                )
+            }
+        }
+        .padding(.horizontal, 14)
+        .background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 15))
+        .overlay {
+            RoundedRectangle(cornerRadius: 15)
+                .stroke(.white.opacity(0.06), lineWidth: 1)
+        }
+    }
+
+    private func categoryRow(
+        icon: String,
+        title: String,
+        value: Int,
+        color: Color,
+        badge: String? = nil
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(color)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.system(size: 13, weight: .semibold))
+                if let badge {
+                    Text(badge)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.orange.opacity(0.12), in: Capsule())
+                }
+            }
+            Spacer()
+            Text("\(value)%")
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .monospacedDigit()
+        }
+        .padding(.vertical, 11)
+    }
+
+    private func evidence(_ snapshot: PredictionSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("为什么是这个概率")
+                    .font(.system(size: 12, weight: .bold))
+                Spacer()
+                if snapshot.isStale {
+                    Label("缓存", systemImage: "clock.arrow.circlepath")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            ForEach(snapshot.evidence.prefix(3)) { item in
+                HStack(alignment: .top, spacing: 9) {
+                    Circle()
+                        .fill(evidenceColor(item.category))
+                        .frame(width: 6, height: 6)
+                        .padding(.top, 5)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 5) {
+                            Text(item.label)
+                                .font(.system(size: 11, weight: .semibold))
+                            if item.delta != 0 {
+                                Text(item.delta > 0 ? "+\(item.delta)" : "\(item.delta)")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(item.delta > 0 ? .green : .red)
+                            }
+                        }
+                        Text(item.detail)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 0)
+                    if let sourceURL = item.sourceURL {
+                        Link(destination: sourceURL) {
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 15))
+    }
+
+    private func sourceWarning(_ snapshot: PredictionSnapshot) -> some View {
+        Label(
+            snapshot.isStale ? "部分来源异常，当前使用最近缓存" : "部分公开来源暂时不可用",
+            systemImage: "wifi.exclamationmark"
+        )
+        .font(.caption)
+        .foregroundStyle(.orange)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var loading: some View {
+        VStack(spacing: 14) {
+            ProgressView().controlSize(.small)
+            Text(model.lastError ?? "正在读取 Tibo 与 Codex 的公开信号…")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(30)
+    }
+
+    private var footer: some View {
+        HStack {
+            Label("每 15 分钟检查", systemImage: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            if let date = model.snapshot?.dataUpdatedAt {
+                Text(date, style: .relative)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            Button("退出") {
+                NSApplication.shared.terminate(nil)
+            }
+            .buttonStyle(.borderless)
+            .font(.caption)
+        }
+    }
+
+    private func levelColor(_ level: ProbabilityLevel) -> Color {
+        switch level {
+        case .green: .green
+        case .yellow: .yellow
+        case .orange: .orange
+        case .red: .red
+        }
+    }
+
+    private func evidenceColor(_ category: String) -> Color {
+        switch category {
+        case "positive": .green
+        case "negative": .red
+        case "targeted": .orange
+        default: .secondary
+        }
+    }
+}
