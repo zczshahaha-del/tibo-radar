@@ -55,6 +55,7 @@ Codex 偶尔会进行全局福利重置，或向用户发放可储存的重置�
 - [x] 用户自行填写 DeepSeek 或千问 API Key，Key 保存在 macOS 钥匙串。
 - [x] 千问开启百炼联网搜索；DeepSeek 明确只分析 App 采集的公开原文。
 - [x] 已创建 Issue 3 和 `feature/3-ai-provider-prediction` 开发分支。
+- [x] 用普通话显示可能时间和判断可靠性，并直接解释可靠或不可靠的原因。
 
 ## 用户怎样使用
 
