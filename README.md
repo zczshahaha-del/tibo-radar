@@ -9,20 +9,27 @@
 
 第一版只读公开信息，不登录 X，不读取或兑换你的 Codex 重置卡。
 
-## 当前阶段
+## 直接使用（macOS）
 
-项目正在开发 `v0.1.0`。第一版会提供命令行快照、本地网页和 macOS
-系统通知。详细范围见 [`docs/requirements.md`](docs/requirements.md)。
+不需要安装第三方依赖。解压后：
 
-## 计划中的运行方式
+1. 双击 `scripts/Tibo-Radar.command` 打开预测面板；
+2. 需要系统提醒时，另行双击 `scripts/Tibo-Radar-通知.command`；
+3. 关闭相应终端窗口即可停止。
+
+若 macOS 第一次阻止 `.command` 文件，右键该文件并选择“打开”。
+
+## 命令行使用
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-tibo-radar snapshot
-tibo-radar serve --open
+export PYTHONPATH="$PWD/src"
+python3 -m tibo_radar snapshot
+python3 -m tibo_radar serve --open
+python3 -m tibo_radar watch --interval 900 --threshold 65
 ```
+
+支持系统自带的 Python 3.9 及以上版本。默认每 15 分钟检查一次；只有概率
+从阈值下方升到阈值上方，或出现新的明确重置事件时才通知，避免重复打扰。
 
 ## 数据来源
 
@@ -32,6 +39,15 @@ tibo-radar serve --open
 
 第三方数据可能延迟或中断，因此每次预测都会显示数据新鲜度和置信度。
 
+## 概率应该怎么读
+
+- “全局重置”是直接恢复大范围用户额度；
+- “普发重置卡”是发到账户、可在以后手动使用的 banked reset；
+- “故障补发”是条件概率，只适用于明确故障时段内受影响的用户；
+- “综合概率”表示前两种普惠事件至少发生一种，不包含定向补发。
+
+这是一项小样本预测，只适合帮助安排用量，不是 OpenAI 的承诺。
+
 ## 安全边界
 
 - 不调用重置卡兑换接口；
@@ -39,3 +55,8 @@ tibo-radar serve --open
 - 不自动发帖、发邮件或操作社交账号；
 - 通知仅在概率跨过阈值或出现明确事件时触发。
 
+## 运行测试
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+```
