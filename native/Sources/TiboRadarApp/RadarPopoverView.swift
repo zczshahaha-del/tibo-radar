@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RadarPopoverView: View {
   @EnvironmentObject private var model: RadarViewModel
+  @State private var showingSettings = false
 
   var body: some View {
     VStack(spacing: 0) {
@@ -11,7 +12,14 @@ struct RadarPopoverView: View {
         .padding(.top, 18)
         .padding(.bottom, 14)
 
-      if let snapshot = model.snapshot {
+      if showingSettings {
+        AISettingsView {
+          showingSettings = false
+        }
+        .environmentObject(model)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 14)
+      } else if let snapshot = model.snapshot {
         VStack(spacing: 12) {
           hero(snapshot)
           categories(snapshot)
@@ -49,8 +57,10 @@ struct RadarPopoverView: View {
         Text("Tibo Radar")
           .font(.system(size: 17, weight: .bold))
         HStack(spacing: 5) {
-          Circle().fill(Color.green).frame(width: 6, height: 6)
-          Text(model.isRefreshing ? "正在刷新" : "运行中")
+          Circle()
+            .fill(model.hasAPIKey ? Color.green : Color.orange)
+            .frame(width: 6, height: 6)
+          Text(statusText)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -58,17 +68,29 @@ struct RadarPopoverView: View {
 
       Spacer()
 
-      Button {
-        Task { await model.refresh() }
-      } label: {
-        Image(systemName: "arrow.clockwise")
-          .font(.system(size: 14, weight: .semibold))
-          .rotationEffect(model.isRefreshing ? .degrees(180) : .zero)
+      HStack(spacing: 13) {
+        Button {
+          showingSettings.toggle()
+        } label: {
+          Image(systemName: showingSettings ? "chevron.left" : "gearshape.fill")
+            .font(.system(size: 13, weight: .semibold))
+        }
+        .buttonStyle(.plain)
+        .help(showingSettings ? "返回预测" : "AI 设置")
+        .accessibilityLabel(showingSettings ? "返回预测" : "AI 设置")
+
+        Button {
+          Task { await model.refresh() }
+        } label: {
+          Image(systemName: "arrow.clockwise")
+            .font(.system(size: 14, weight: .semibold))
+            .rotationEffect(model.isRefreshing ? .degrees(180) : .zero)
+        }
+        .buttonStyle(.plain)
+        .disabled(model.isRefreshing || !model.hasAPIKey || showingSettings)
+        .help("让 AI 重新搜索并判断")
+        .accessibilityLabel("让 AI 重新搜索并判断")
       }
-      .buttonStyle(.plain)
-      .disabled(model.isRefreshing)
-      .help("刷新公开信号")
-      .accessibilityLabel("刷新公开信号")
     }
   }
 
@@ -199,7 +221,7 @@ struct RadarPopoverView: View {
   private func evidence(_ snapshot: PredictionSnapshot) -> some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
-        Text("为什么是这个概率")
+        Text("AI 为什么这样判断")
           .font(.system(size: 12, weight: .bold))
         Spacer()
         if snapshot.isStale {
@@ -260,11 +282,24 @@ struct RadarPopoverView: View {
 
   private var loading: some View {
     VStack(spacing: 14) {
-      ProgressView().controlSize(.small)
+      if model.isRefreshing {
+        ProgressView().controlSize(.small)
+      } else {
+        Image(systemName: "key.horizontal.fill")
+          .font(.system(size: 26))
+          .foregroundStyle(.orange)
+      }
       Text(model.lastError ?? "正在读取 Tibo 与 Codex 的公开信号…")
         .font(.callout)
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
+      if !model.hasAPIKey {
+        Button("打开 AI 设置") {
+          showingSettings = true
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.small)
+      }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .padding(30)
@@ -272,7 +307,7 @@ struct RadarPopoverView: View {
 
   private var footer: some View {
     HStack {
-      Label("每 15 分钟检查", systemImage: "checkmark.circle.fill")
+      Label(model.selectedProvider.displayName, systemImage: "brain.head.profile")
         .font(.caption)
         .foregroundStyle(.secondary)
       Spacer()
@@ -292,6 +327,12 @@ struct RadarPopoverView: View {
       .help("退出 Tibo Radar")
       .accessibilityLabel("退出 Tibo Radar")
     }
+  }
+
+  private var statusText: String {
+    if model.isRefreshing { return "AI 正在判断" }
+    if !model.hasAPIKey { return "需要 API Key" }
+    return "AI 预测已启用"
   }
 
   private func levelColor(_ level: ProbabilityLevel) -> Color {

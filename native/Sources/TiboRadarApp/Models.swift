@@ -1,6 +1,6 @@
 import Foundation
 
-enum RadarSource: String, CaseIterable, Sendable {
+enum RadarSource: String, CaseIterable, Codable, Sendable {
   case forecast
   case timeline
   case feed
@@ -24,7 +24,7 @@ struct SourceBundle: Sendable {
   var errors: [String]
 }
 
-struct Evidence: Identifiable, Equatable, Sendable {
+struct Evidence: Identifiable, Codable, Equatable, Sendable {
   let id: String
   let label: String
   let detail: String
@@ -49,7 +49,7 @@ struct Evidence: Identifiable, Equatable, Sendable {
   }
 }
 
-struct RadarEvent: Identifiable, Equatable, Sendable {
+struct RadarEvent: Identifiable, Codable, Equatable, Sendable {
   let id: String
   let kind: String
   let title: String
@@ -58,7 +58,7 @@ struct RadarEvent: Identifiable, Equatable, Sendable {
   let state: String?
 }
 
-enum ProbabilityLevel: String, Equatable, Sendable {
+enum ProbabilityLevel: String, Codable, Equatable, Sendable {
   case green
   case yellow
   case orange
@@ -74,7 +74,7 @@ enum ProbabilityLevel: String, Equatable, Sendable {
   }
 }
 
-struct PredictionSnapshot: Equatable, Sendable {
+struct PredictionSnapshot: Codable, Equatable, Sendable {
   let generatedAt: Date
   let global24h: Int
   let global48h: Int
@@ -93,4 +93,29 @@ struct PredictionSnapshot: Equatable, Sendable {
   let evidence: [Evidence]
   let latestEvents: [RadarEvent]
   let sourceErrors: [String]
+}
+
+extension PredictionSnapshot {
+  func markedStale(reason: String) -> PredictionSnapshot {
+    PredictionSnapshot(
+      generatedAt: generatedAt,
+      global24h: global24h,
+      global48h: global48h,
+      banked24h: banked24h,
+      banked48h: banked48h,
+      combined24h: combined24h,
+      combined48h: combined48h,
+      affectedUserBanked24h: affectedUserBanked24h,
+      confidence: "low",
+      confidenceNote: reason,
+      level: level,
+      likelyWindow: likelyWindow,
+      lastResetAt: lastResetAt,
+      dataUpdatedAt: dataUpdatedAt,
+      isStale: true,
+      evidence: evidence,
+      latestEvents: latestEvents,
+      sourceErrors: sourceErrors + [reason]
+    )
+  }
 }
