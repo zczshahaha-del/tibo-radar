@@ -117,13 +117,13 @@ struct RadarPopoverView: View {
         VStack(alignment: .leading, spacing: 12) {
           metric("48 小时", "\(snapshot.combined48h)%")
           metric(
-            "高发时段",
-            snapshot.likelyWindow.replacingOccurrences(
-              of: "北京时间 ", with: ""
-            ))
-          metric("置信度", confidenceLabel(snapshot.confidence))
+            "最可能什么时候",
+            PredictionCopy.likelyTime(snapshot.likelyWindow),
+            lineLimit: 2
+          )
+          metric("这个判断靠谱吗", PredictionCopy.reliability(snapshot.confidence))
         }
-        .frame(width: 112, alignment: .leading)
+        .frame(width: 128, alignment: .leading)
       }
     }
     .padding(18)
@@ -141,14 +141,18 @@ struct RadarPopoverView: View {
     }
   }
 
-  private func metric(_ label: String, _ value: String) -> some View {
+  private func metric(
+    _ label: String,
+    _ value: String,
+    lineLimit: Int = 1
+  ) -> some View {
     VStack(alignment: .leading, spacing: 2) {
       Text(label.uppercased())
         .font(.system(size: 9, weight: .medium))
         .foregroundStyle(.tertiary)
       Text(value)
         .font(.system(size: 13, weight: .semibold, design: .rounded))
-        .lineLimit(1)
+        .lineLimit(lineLimit)
         .minimumScaleFactor(0.75)
     }
   }
@@ -221,7 +225,7 @@ struct RadarPopoverView: View {
   private func evidence(_ snapshot: PredictionSnapshot) -> some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
-        Text("AI 为什么这样判断")
+        Text(PredictionCopy.reliabilityTitle(snapshot.confidence))
           .font(.system(size: 12, weight: .bold))
         Spacer()
         if snapshot.isStale {
@@ -231,7 +235,19 @@ struct RadarPopoverView: View {
         }
       }
 
-      ForEach(snapshot.evidence.prefix(3)) { item in
+      Text(snapshot.confidenceNote)
+        .font(.system(size: 10))
+        .foregroundStyle(.secondary)
+        .lineLimit(3)
+        .fixedSize(horizontal: false, vertical: true)
+
+      Divider()
+
+      Text("主要依据")
+        .font(.system(size: 10, weight: .semibold))
+        .foregroundStyle(.tertiary)
+
+      ForEach(snapshot.evidence.prefix(2)) { item in
         HStack(alignment: .top, spacing: 9) {
           Circle()
             .fill(evidenceColor(item.category))
@@ -356,11 +372,4 @@ struct RadarPopoverView: View {
     }
   }
 
-  private func confidenceLabel(_ confidence: String) -> String {
-    switch confidence.lowercased() {
-    case "high": "高"
-    case "medium": "中"
-    default: "低"
-    }
-  }
 }

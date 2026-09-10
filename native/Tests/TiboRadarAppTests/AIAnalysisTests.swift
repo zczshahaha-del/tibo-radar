@@ -24,7 +24,8 @@ final class AIAnalysisTests: XCTestCase {
         )
       ]
     )
-    let snapshot = try analysis.validated().snapshot(bundle: bundle())
+    let now = ISO8601DateFormatter().date(from: "2026-09-10T12:30:00Z")!
+    let snapshot = try analysis.validated().snapshot(bundle: bundle(), now: now)
 
     XCTAssertEqual(snapshot.global24h, 30)
     XCTAssertEqual(snapshot.banked24h, 20)

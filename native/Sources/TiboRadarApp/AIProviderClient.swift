@@ -175,8 +175,8 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
         "banked_48h": 0到100整数,
         "affected_user_banked_24h": 0到100整数或null,
         "confidence": "low或medium或high",
-        "confidence_note": "说明证据质量和最大不确定性",
-        "likely_window": "北京时间的可能时间段；无法判断就写无法可靠判断",
+        "confidence_note": "不超过45个中文字符，直说为什么可靠或不可靠",
+        "likely_window": "只写简短北京时间，如9月11日 08:00–12:00；没有可靠时间必须写暂无可靠时间",
         "summary": "一句话综合判断",
         "evidence": [
           {
