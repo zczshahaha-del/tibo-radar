@@ -7,17 +7,19 @@
 - 未来 24 / 48 小时普发 banked reset（重置卡）的概率；
 - 两者至少发生一个的综合概率。
 
-原生 App 只读公开信息，不登录 X，不读取或兑换你的 Codex 重置卡。
+原生 App 只读公开信息，不登录 X，不读取或兑换你的 Codex 重置卡。概率由
+用户选择的 DeepSeek 或千问模型生成，不再使用本地关键词规则打分。
 
 ## 使用原生 macOS App
 
 当前验收包支持 Apple Silicon Mac 和 macOS 13 及以上版本，不需要 Python、
 浏览器或终端：
 
-1. 解压 `Tibo-Radar-v0.2.0-macOS-arm64.zip`；
+1. 解压 `Tibo-Radar-v0.3.0-macOS-arm64.zip`；
 2. 把 `Tibo Radar.app` 拖入“应用程序”，或直接双击运行；
-3. 第一次打开时允许系统通知；
-4. 点击屏幕右上角的雷达图标查看预测，点击面板底部的退出按钮即可停止。
+3. 点击菜单栏雷达图标，再点右上角齿轮；
+4. 选择 DeepSeek 或千问，填写自己的 API Key，点击“保存并测试”；
+5. 返回面板并点击刷新；第一次产生有效 AI 结果后再按提示允许系统通知。
 
 当前是本机验收包，使用临时签名。如果 macOS 第一次阻止打开，请右键
 `Tibo Radar.app` 并选择“打开”。安装、升级和卸载说明见
@@ -26,10 +28,22 @@
 ## 原生 App 怎样工作
 
 - 启动后只常驻菜单栏，不显示 Dock 图标；
-- 首次启动立即读取信号，此后每 15 分钟刷新，也可以手动刷新；
+- 每 15 分钟检查公开信号；发现新资料时调用 AI，相同资料最多每小时重新判断
+  一次，避免无意义消耗额度；手动刷新始终立即调用 AI；
+- DeepSeek 分析 App 实时采集的公开原文；千问还会开启百炼联网搜索；
+- 两家使用独立 Key，可以随时切换，并可以修改模型名称；
 - 24 小时综合概率从 65% 以下升到 65% 以上时发送系统通知；
 - 出现新的明确重置或重置卡事件时提醒一次，不重复轰炸；
-- 网络失败时读取 `Application Support/TiboRadar` 中的最近公开缓存。
+- 网络或 AI 失败时读取 `Application Support/TiboRadar` 中的最近 AI 快照，并
+  明确标记为旧结果；绝不回退到规则概率。
+
+## API Key
+
+- DeepSeek 默认模型：`deepseek-flash`，使用 DeepSeek 官方接口。
+- 千问默认模型：`qwen-plus`，使用阿里云百炼中国站接口并开启联网搜索。
+- API Key 只保存在 macOS 钥匙串；不会写入 UserDefaults、缓存、日志或交付包。
+- App 不提供自定义接口地址，避免误把 Key 发给非官方主机。
+- 刷新会产生模型调用费用，具体费用由对应服务商账户结算。
 
 ## 构建和测试
 
@@ -54,9 +68,11 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 
 ## 数据来源
 
-- `codex-reset.com` 提供的公开 forecast、timeline 与 feed API；
+- `codex-reset.com` 提供的公开历史、timeline 与 Tibo feed API；第三方已有概率
+  不会交给正式结果直接使用；
 - OpenAI Status 的公开状态数据；
 - 原始 Tibo 帖子的公开链接，用于展示证据。
+- 选择千问时，由阿里云百炼提供的联网搜索补充近期网络讨论。
 
 第三方数据可能延迟或中断，因此每次预测都会显示数据新鲜度和置信度。
 
@@ -72,6 +88,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 ## 安全边界
 
 - 不调用重置卡兑换接口；
+- DeepSeek / 千问 API Key 只保存到 macOS 钥匙串；
 - 不保存 ChatGPT / Codex 登录凭据；
 - 不自动发帖、发邮件或操作社交账号；
 - 通知仅在概率跨过阈值或出现明确事件时触发。

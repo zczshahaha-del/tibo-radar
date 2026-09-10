@@ -121,7 +121,7 @@ struct RadarPopoverView: View {
             snapshot.likelyWindow.replacingOccurrences(
               of: "北京时间 ", with: ""
             ))
-          metric("置信度", snapshot.confidence)
+          metric("置信度", confidenceLabel(snapshot.confidence))
         }
         .frame(width: 112, alignment: .leading)
       }
@@ -307,7 +307,10 @@ struct RadarPopoverView: View {
 
   private var footer: some View {
     HStack {
-      Label(model.selectedProvider.displayName, systemImage: "brain.head.profile")
+      Label(
+        "\(model.selectedProvider.displayName) · 15 分钟巡检",
+        systemImage: "brain.head.profile"
+      )
         .font(.caption)
         .foregroundStyle(.secondary)
       Spacer()
@@ -350,6 +353,14 @@ struct RadarPopoverView: View {
     case "negative": .red
     case "targeted": .orange
     default: .secondary
+    }
+  }
+
+  private func confidenceLabel(_ confidence: String) -> String {
+    switch confidence.lowercased() {
+    case "high": "高"
+    case "medium": "中"
+    default: "低"
     }
   }
 }

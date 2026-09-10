@@ -17,6 +17,7 @@ final class RadarViewModel: ObservableObject {
   private let credentials: any APIKeyStoring
   private let preferences: ProviderPreferences
   private let snapshotStore: AISnapshotStore
+  private let refreshGate: AIRefreshGate
   private let notifications: NotificationManager
   private var refreshTimer: Timer?
 
@@ -26,6 +27,7 @@ final class RadarViewModel: ObservableObject {
     credentials: any APIKeyStoring = KeychainAPIKeyStore(),
     preferences: ProviderPreferences = ProviderPreferences(),
     snapshotStore: AISnapshotStore = AISnapshotStore(),
+    refreshGate: AIRefreshGate = AIRefreshGate(),
     notifications: NotificationManager = NotificationManager()
   ) {
     self.client = client
@@ -33,6 +35,7 @@ final class RadarViewModel: ObservableObject {
     self.credentials = credentials
     self.preferences = preferences
     self.snapshotStore = snapshotStore
+    self.refreshGate = refreshGate
     self.notifications = notifications
 
     let provider = preferences.selectedProvider
@@ -49,13 +52,13 @@ final class RadarViewModel: ObservableObject {
     Task { [weak self] in
       guard let self, self.hasAPIKey else { return }
       await self.notifications.prepareAuthorization()
-      await self.refresh()
+      await self.refresh(force: false)
     }
     refreshTimer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) {
       [weak self] _ in
       Task { @MainActor [weak self] in
         guard self?.hasAPIKey == true else { return }
-        await self?.refresh()
+        await self?.refresh(force: false)
       }
     }
   }
@@ -74,10 +77,11 @@ final class RadarViewModel: ObservableObject {
     credentials = KeychainAPIKeyStore()
     preferences = ProviderPreferences()
     snapshotStore = AISnapshotStore()
+    refreshGate = AIRefreshGate()
     notifications = NotificationManager()
   }
 
-  func refresh() async {
+  func refresh(force: Bool = true) async {
     guard !isRefreshing else { return }
     guard let apiKey = try? credentials.read(for: selectedProvider), !apiKey.isEmpty else {
       hasAPIKey = false
@@ -103,6 +107,15 @@ final class RadarViewModel: ObservableObject {
         throw AIProviderError.invalidAnalysis("没有获取到可供 DeepSeek 判断的公开资料。")
       }
       let context = try AIInputBuilder.makeContext(bundle: bundle)
+      let fingerprint = try AIInputBuilder.fingerprint(bundle: bundle)
+      if !refreshGate.shouldAnalyze(
+        configuration: configuration,
+        sourceFingerprint: fingerprint,
+        force: force
+      ), let cached = snapshotStore.load(for: selectedProvider) {
+        snapshot = cached
+        return
+      }
       let analysis = try await analyzer.analyze(
         context: context,
         configuration: configuration,
@@ -111,6 +124,10 @@ final class RadarViewModel: ObservableObject {
       let next = analysis.snapshot(bundle: bundle)
       snapshot = next
       try snapshotStore.save(next, configuration: configuration)
+      refreshGate.recordSuccess(
+        configuration: configuration,
+        sourceFingerprint: fingerprint
+      )
       await notifications.process(next)
     } catch {
       let message = Self.displayMessage(for: error)

@@ -1,7 +1,22 @@
 import Foundation
+import CryptoKit
 
 enum AIInputBuilder {
   static func makeContext(bundle: SourceBundle, now: Date = Date()) throws -> String {
+    try serializedContext(bundle: bundle, now: now)
+  }
+
+  static func fingerprint(bundle: SourceBundle) throws -> String {
+    let stableContext = try serializedContext(
+      bundle: bundle,
+      now: Date(timeIntervalSince1970: 0)
+    )
+    return SHA256.hash(data: Data(stableContext.utf8))
+      .map { String(format: "%02x", $0) }
+      .joined()
+  }
+
+  private static func serializedContext(bundle: SourceBundle, now: Date) throws -> String {
     var context: [String: Any] = [
       "current_time": ISO8601DateFormatter().string(from: now),
       "timezone": "Asia/Shanghai",
