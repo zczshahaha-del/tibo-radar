@@ -63,12 +63,18 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
       apiKey: apiKey
     )
     let json = extractJSONObject(from: content)
-    guard let data = json.data(using: .utf8),
-      let analysis = try? JSONDecoder().decode(AIAnalysis.self, from: data)
-    else {
+    guard let data = json.data(using: .utf8) else {
       throw AIProviderError.invalidAnalysis("AI 没有返回约定的信号判断 JSON。")
     }
-    return try analysis.validated()
+    do {
+      return try JSONDecoder().decode(AIAnalysis.self, from: data).validated()
+    } catch let error as AIProviderError {
+      throw error
+    } catch {
+      throw AIProviderError.invalidAnalysis(
+        "AI 返回的信号字段不符合约定：\(Self.decodingIssue(error))"
+      )
+    }
   }
 
   func testConnection(
@@ -144,6 +150,7 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
     ]
     if !isConnectionTest {
       body["response_format"] = ["type": "json_object"]
+      body["temperature"] = 0
     }
     if configuration.provider == .qwen {
       body["enable_search"] = !isConnectionTest
@@ -219,6 +226,21 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
       return redacted(message, apiKey: apiKey)
     }
     return "请求失败"
+  }
+
+  private static func decodingIssue(_ error: Error) -> String {
+    switch error {
+    case DecodingError.keyNotFound(let key, _):
+      return "缺少 \(key.stringValue)"
+    case DecodingError.valueNotFound(_, let context):
+      return "\(context.codingPath.last?.stringValue ?? "字段") 为空"
+    case DecodingError.typeMismatch(_, let context):
+      return "\(context.codingPath.last?.stringValue ?? "字段") 类型错误"
+    case DecodingError.dataCorrupted(let context):
+      return "\(context.codingPath.last?.stringValue ?? "字段") 值无法识别"
+    default:
+      return "JSON 结构错误"
+    }
   }
 
   private static func redacted(_ message: String, apiKey: String) -> String {

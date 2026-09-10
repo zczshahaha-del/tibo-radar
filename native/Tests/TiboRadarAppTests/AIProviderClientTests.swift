@@ -57,6 +57,7 @@ final class AIProviderClientTests: XCTestCase {
     XCTAssertEqual(capturedRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer test-qwen-key")
     XCTAssertEqual(body["enable_search"] as? Bool, true)
     XCTAssertEqual(body["model"] as? String, "qwen-plus")
+    XCTAssertEqual(body["temperature"] as? Int, 0)
     XCTAssertFalse(String(data: capturedBody ?? Data(), encoding: .utf8)?.contains("test-qwen-key") == true)
     XCTAssertEqual(analysis.globalSignal, .weak)
     let requestText = String(data: capturedBody ?? Data(), encoding: .utf8) ?? ""
