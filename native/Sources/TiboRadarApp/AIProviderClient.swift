@@ -64,7 +64,7 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
     )
     let json = extractJSONObject(from: content)
     guard let data = json.data(using: .utf8) else {
-      throw AIProviderError.invalidAnalysis("AI 没有返回约定的信号判断 JSON。")
+      throw AIProviderError.invalidAnalysis("AI 没有返回约定的概率预测 JSON。")
     }
     do {
       return try JSONDecoder().decode(AIAnalysis.self, from: data).validated()
@@ -72,7 +72,7 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
       throw error
     } catch {
       throw AIProviderError.invalidAnalysis(
-        "AI 返回的信号字段不符合约定：\(Self.decodingIssue(error))"
+        "AI 返回的预测字段不符合约定：\(Self.decodingIssue(error))"
       )
     }
   }

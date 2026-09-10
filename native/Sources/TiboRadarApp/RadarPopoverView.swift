@@ -358,7 +358,7 @@ struct RadarPopoverView: View {
   private var statusText: String {
     if model.isRefreshing { return "AI 正在判断" }
     if !model.hasAPIKey { return "需要 API Key" }
-    return "AI 信号判断已启用"
+    return "AI 概率预测已启用"
   }
 
   private func levelColor(_ probability: Int) -> Color {

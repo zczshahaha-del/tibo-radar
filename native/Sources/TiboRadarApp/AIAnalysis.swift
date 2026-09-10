@@ -188,8 +188,8 @@ struct AIAnalysis: Codable, Equatable, Sendable {
       return freshness + calibration.note
     }
     return freshness
-      + "AI 参考历史基准：24 小时 \(estimate.label24h)，48 小时 \(estimate.label48h)，"
-      + "共 \(estimate.sampleSize) 个回放时段。"
+      + "历史基准（\(estimate.sampleSize) 次回放）：24 小时 \(estimate.label24h)，"
+      + "48 小时 \(estimate.label48h)。"
   }
 }
 

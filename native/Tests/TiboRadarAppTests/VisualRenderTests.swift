@@ -37,7 +37,7 @@ final class VisualRenderTests: XCTestCase {
         brierScore: 0.106,
         quality: .historicalEstimate
       ),
-      baselineNote: "AI 参考历史基准：24 小时 12–37%，48 小时 25–55%，共 307 个回放时段。",
+      baselineNote: "历史基准（307 次回放）：24 小时 12–37%，48 小时 25–55%。",
       lastResetAt: Date().addingTimeInterval(-2.2 * 86_400),
       dataUpdatedAt: Date(),
       isStale: false,
@@ -143,7 +143,7 @@ final class VisualRenderTests: XCTestCase {
         brierScore: 0.106,
         quality: .historicalEstimate
       ),
-      baselineNote: "AI 参考历史基准：24 小时 12–37%，48 小时 25–55%，共 307 个回放时段。",
+      baselineNote: "历史基准（307 次回放）：24 小时 12–37%，48 小时 25–55%。",
       lastResetAt: nil,
       dataUpdatedAt: Date(),
       isStale: false,
