@@ -17,6 +17,10 @@ mkdir -p "$staging_app/Contents/MacOS" "$staging_app/Contents/Resources"
 cp "$native_dir/Info.plist" "$staging_app/Contents/Info.plist"
 cp "$binary_dir/TiboRadar" "$staging_app/Contents/MacOS/TiboRadar"
 chmod +x "$staging_app/Contents/MacOS/TiboRadar"
+
+iconset_dir="$native_dir/.build/TiboRadar.iconset"
+swift "$native_dir/Tools/GenerateIcon.swift" "$iconset_dir"
+iconutil -c icns "$iconset_dir" -o "$staging_app/Contents/Resources/AppIcon.icns"
 codesign --force --deep --sign - "$staging_app"
 
 final_app="$output_dir/Tibo Radar.app"

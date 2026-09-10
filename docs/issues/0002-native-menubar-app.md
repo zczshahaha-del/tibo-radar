@@ -47,3 +47,13 @@
 - 2026-09-10：首次 Swift 构建后发现 `native/.build` 临时产物被 Git 跟踪。
   原因是原有忽略规则只有 `build/`，没有匹配 SwiftPM 的隐藏目录；已增加
   `.build/` 规则并从 Git 索引移除临时产物，本机编译缓存不受影响。
+- 2026-09-10：尝试为界面自动验收增加条件式测试窗口时，SwiftUI 报错
+  `closure containing control flow statement cannot be used with result builder
+  'SceneBuilder'`。原因是 `App.body` 的 Scene 构建器不支持该条件分支；已撤回
+  测试钩子，避免为测试改变正式 App 的启动行为，继续以实际菜单栏进程验收。
+- 2026-09-10：首次离屏视觉快照只显示头部和底部，中间 `ScrollView` 内容没有
+  渲染。面板内容本身能放进固定高度，因此改为紧凑 `VStack`，随后重新生成
+  2x 快照确认所有信息完整显示。
+- 2026-09-10：首次加入 `.icns` 图标后，图标中间目录留在 App 临时打包目录，
+  导致最后的 `rmdir` 返回 `Directory not empty`。已把图标中间文件固定放入
+  Git 忽略的 `native/.build`，确保打包临时目录只包含最终 `.app`。

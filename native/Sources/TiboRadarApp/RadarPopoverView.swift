@@ -12,18 +12,16 @@ struct RadarPopoverView: View {
                 .padding(.bottom, 14)
 
             if let snapshot = model.snapshot {
-                ScrollView {
-                    VStack(spacing: 12) {
-                        hero(snapshot)
-                        categories(snapshot)
-                        evidence(snapshot)
-                        if !snapshot.sourceErrors.isEmpty {
-                            sourceWarning(snapshot)
-                        }
+                VStack(spacing: 12) {
+                    hero(snapshot)
+                    categories(snapshot)
+                    evidence(snapshot)
+                    if !snapshot.sourceErrors.isEmpty {
+                        sourceWarning(snapshot)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 14)
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
             } else {
                 loading
             }
@@ -281,11 +279,16 @@ struct RadarPopoverView: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
-            Button("退出") {
+            Button {
                 NSApplication.shared.terminate(nil)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
             }
             .buttonStyle(.borderless)
             .font(.caption)
+            .help("退出 Tibo Radar")
+            .accessibilityLabel("退出 Tibo Radar")
         }
     }
 

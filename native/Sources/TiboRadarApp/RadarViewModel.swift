@@ -32,6 +32,13 @@ final class RadarViewModel: ObservableObject {
         }
     }
 
+    init(previewSnapshot: PredictionSnapshot) {
+        snapshot = previewSnapshot
+        client = RadarClient()
+        predictor = Predictor()
+        notifications = NotificationManager()
+    }
+
     func refresh() async {
         guard !isRefreshing else { return }
         isRefreshing = true
