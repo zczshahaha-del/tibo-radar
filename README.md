@@ -7,29 +7,50 @@
 - 未来 24 / 48 小时普发 banked reset（重置卡）的概率；
 - 两者至少发生一个的综合概率。
 
-第一版只读公开信息，不登录 X，不读取或兑换你的 Codex 重置卡。
+原生 App 只读公开信息，不登录 X，不读取或兑换你的 Codex 重置卡。
 
-## 直接使用（macOS）
+## 使用原生 macOS App
 
-不需要安装第三方依赖。解压后：
+当前验收包支持 Apple Silicon Mac 和 macOS 13 及以上版本，不需要 Python、
+浏览器或终端：
 
-1. 双击 `scripts/Tibo-Radar.command` 打开预测面板；
-2. 需要系统提醒时，另行双击 `scripts/Tibo-Radar-通知.command`；
-3. 关闭相应终端窗口即可停止。
+1. 解压 `Tibo-Radar-v0.2.0-macOS-arm64.zip`；
+2. 把 `Tibo Radar.app` 拖入“应用程序”，或直接双击运行；
+3. 第一次打开时允许系统通知；
+4. 点击屏幕右上角的雷达图标查看预测，点击面板底部的退出按钮即可停止。
 
-若 macOS 第一次阻止 `.command` 文件，右键该文件并选择“打开”。
+当前是本机验收包，使用临时签名。如果 macOS 第一次阻止打开，请右键
+`Tibo Radar.app` 并选择“打开”。安装、升级和卸载说明见
+[`docs/macos-app.md`](docs/macos-app.md)。
 
-## 命令行使用
+## 原生 App 怎样工作
+
+- 启动后只常驻菜单栏，不显示 Dock 图标；
+- 首次启动立即读取信号，此后每 15 分钟刷新，也可以手动刷新；
+- 24 小时综合概率从 65% 以下升到 65% 以上时发送系统通知；
+- 出现新的明确重置或重置卡事件时提醒一次，不重复轰炸；
+- 网络失败时读取 `Application Support/TiboRadar` 中的最近公开缓存。
+
+## 构建和测试
 
 ```bash
-export PYTHONPATH="$PWD/src"
-python3 -m tibo_radar snapshot
-python3 -m tibo_radar serve --open
-python3 -m tibo_radar watch --interval 900 --threshold 65
+swift test --package-path native
+TIBO_RADAR_LIVE_TEST=1 swift test --package-path native
+native/build-app.sh
 ```
 
-支持系统自带的 Python 3.9 及以上版本。默认每 15 分钟检查一次；只有概率
-从阈值下方升到阈值上方，或出现新的明确重置事件时才通知，避免重复打扰。
+Release App 输出到 `dist/native/Tibo Radar.app`。SwiftUI 源码、测试、图标
+生成和打包脚本均位于 `native/`。
+
+## Python 原型
+
+`src/tibo_radar/` 保留了最初用于验证预测规则的 Python 原型。它不参与原生
+App 运行；需要回归对照时可按下面方式执行：
+
+```bash
+PYTHONPATH=src python3 -m tibo_radar snapshot
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+```
 
 ## 数据来源
 
@@ -54,9 +75,3 @@ python3 -m tibo_radar watch --interval 900 --threshold 65
 - 不保存 ChatGPT / Codex 登录凭据；
 - 不自动发帖、发邮件或操作社交账号；
 - 通知仅在概率跨过阈值或出现明确事件时触发。
-
-## 运行测试
-
-```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
-```
