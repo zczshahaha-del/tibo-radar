@@ -48,6 +48,25 @@ final class AIAnalysisTests: XCTestCase {
     XCTAssertThrowsError(try analysis.validated())
   }
 
+  func testAnalysisRejectsPercentageHiddenInExplanation() {
+    let analysis = AIAnalysis(
+      globalSignal: .weak,
+      bankedSignal: .none,
+      affectedUserSignal: nil,
+      analysisNote: "我主观认为有 30% 的可能",
+      likelyWindow: "暂无可靠时间",
+      summary: "有一点迹象",
+      evidence: []
+    )
+
+    XCTAssertThrowsError(try analysis.validated()) { error in
+      XCTAssertEqual(
+        error as? AIProviderError,
+        .invalidAnalysis("AI 返回了未经校准的百分比，已拒绝显示。")
+      )
+    }
+  }
+
   func testInputContextExcludesLegacyForecastProbability() throws {
     let context = try AIInputBuilder.makeContext(bundle: bundle())
 

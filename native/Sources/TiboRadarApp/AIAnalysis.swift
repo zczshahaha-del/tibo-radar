@@ -37,6 +37,11 @@ struct AIAnalysis: Codable, Equatable, Sendable {
     else {
       throw AIProviderError.invalidAnalysis("模型结果缺少判断原因或时间窗口。")
     }
+    let userFacingText = [analysisNote, likelyWindow, summary]
+      + evidence.flatMap { [$0.label, $0.detail] }
+    guard !userFacingText.contains(where: Self.containsPercentage) else {
+      throw AIProviderError.invalidAnalysis("AI 返回了未经校准的百分比，已拒绝显示。")
+    }
     return self
   }
 
@@ -86,6 +91,10 @@ struct AIAnalysis: Codable, Equatable, Sendable {
       return lowered
     }
     return "context"
+  }
+
+  private static func containsPercentage(_ value: String) -> Bool {
+    value.contains("%") || value.contains("％") || value.contains("百分之")
   }
 }
 
