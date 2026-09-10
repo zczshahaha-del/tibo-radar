@@ -44,3 +44,6 @@
 
 - 2026-09-10：用户确认原生菜单栏概念图；创建 Issue 2 和开发分支
   `feature/2-native-menubar`。
+- 2026-09-10：首次 Swift 构建后发现 `native/.build` 临时产物被 Git 跟踪。
+  原因是原有忽略规则只有 `build/`，没有匹配 SwiftPM 的隐藏目录；已增加
+  `.build/` 规则并从 Git 索引移除临时产物，本机编译缓存不受影响。
