@@ -101,23 +101,26 @@ struct RadarPopoverView: View {
           Label(snapshot.overallSignal.label, systemImage: "circle.fill")
             .font(.caption.weight(.semibold))
             .foregroundStyle(levelColor(snapshot.overallSignal))
-          Text(snapshot.calibratedProbability?.label24h ?? "暂无可靠概率")
+          Text(snapshot.probabilityEstimate?.label24h ?? "暂无估计")
             .font(
               .system(
-                size: snapshot.calibratedProbability == nil ? 27 : 46,
+                size: snapshot.probabilityEstimate == nil ? 27 : 46,
                 weight: .bold,
                 design: .rounded
               )
             )
             .minimumScaleFactor(0.75)
             .lineLimit(1)
-          Text("未来 24 小时")
+          Text(
+            "未来 24 小时"
+              + (snapshot.probabilityEstimate.map { " · \($0.quality.label)" } ?? "")
+          )
             .font(.callout)
             .foregroundStyle(.secondary)
         }
         Spacer()
         VStack(alignment: .leading, spacing: 12) {
-          metric("48 小时", snapshot.calibratedProbability?.label48h ?? "暂无")
+          metric("48 小时", snapshot.probabilityEstimate?.label48h ?? "暂无")
           metric("现在怎么做", snapshot.overallSignal.action)
           metric(
             "最可能什么时候",
@@ -245,7 +248,7 @@ struct RadarPopoverView: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 3) {
-        Text(snapshot.calibratedProbability == nil ? "概率为什么没显示" : "概率怎样得出")
+        Text(snapshot.probabilityEstimate == nil ? "为什么没有估计" : "概率范围怎样得出")
           .font(.system(size: 10, weight: .semibold))
           .foregroundStyle(.tertiary)
         Text(snapshot.probabilityNote)

@@ -92,13 +92,26 @@ enum SignalStrength: String, Codable, Equatable, Sendable {
   }
 }
 
-struct CalibratedProbabilityRange: Codable, Equatable, Sendable {
+enum ProbabilityQuality: String, Codable, Equatable, Sendable {
+  case historicalEstimate
+  case calibrated
+
+  var label: String {
+    switch self {
+    case .historicalEstimate: "历史估计"
+    case .calibrated: "已校准"
+    }
+  }
+}
+
+struct ProbabilityEstimate: Codable, Equatable, Sendable {
   let lower24h: Int
   let upper24h: Int
   let lower48h: Int
   let upper48h: Int
   let sampleSize: Int
   let brierScore: Double
+  let quality: ProbabilityQuality
 
   var label24h: String { "\(lower24h)–\(upper24h)%" }
   var label48h: String { "\(lower48h)–\(upper48h)%" }
@@ -112,7 +125,7 @@ struct PredictionSnapshot: Codable, Equatable, Sendable {
   let analysisNote: String
   let summary: String
   let likelyWindow: String
-  let calibratedProbability: CalibratedProbabilityRange?
+  let probabilityEstimate: ProbabilityEstimate?
   let probabilityNote: String
   let lastResetAt: Date?
   let dataUpdatedAt: Date?
@@ -136,8 +149,8 @@ extension PredictionSnapshot {
       analysisNote: reason,
       summary: summary,
       likelyWindow: likelyWindow,
-      calibratedProbability: nil,
-      probabilityNote: "来源已过期，暂不显示概率。",
+      probabilityEstimate: nil,
+      probabilityNote: "来源已过期，暂不显示估计。",
       lastResetAt: lastResetAt,
       dataUpdatedAt: dataUpdatedAt,
       isStale: true,

@@ -33,7 +33,7 @@ final class AISnapshotStore: @unchecked Sendable {
     configuration: AIConfiguration
   ) throws {
     let cached = CachedAISnapshot(
-      version: 2,
+      version: 3,
       provider: configuration.provider,
       model: configuration.model,
       snapshot: snapshot
@@ -45,7 +45,7 @@ final class AISnapshotStore: @unchecked Sendable {
   func load(for provider: AIProvider) -> PredictionSnapshot? {
     guard let data = try? Data(contentsOf: url(for: provider)),
       let cached = try? JSONDecoder().decode(CachedAISnapshot.self, from: data),
-      cached.version == 2,
+      cached.version == 3,
       cached.provider == provider
     else { return nil }
     return cached.snapshot

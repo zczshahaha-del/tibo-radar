@@ -1,7 +1,7 @@
 import Foundation
 
 struct ProbabilityCalibrationResult: Equatable, Sendable {
-  let range: CalibratedProbabilityRange?
+  let estimate: ProbabilityEstimate?
   let note: String
 }
 
@@ -10,22 +10,14 @@ enum ProbabilityCalibration {
     guard let forecast = bundle.payloads[.forecast]?.objectValue,
       let backtest = forecast.object("backtest")
     else {
-      return unavailable("还没有足够的历史预测记录，所以先不显示数字。")
+      return unavailable("没有拿到历史回放数据，所以暂时无法估计。")
     }
 
-    guard backtest.string("status") == "validated" else {
-      return unavailable("拿历史数据试算后，结果还不够准，所以先不显示数字。")
-    }
     guard let sampleSize = backtest.int("sample_size"), sampleSize >= 100 else {
-      return unavailable("可检查的历史预测太少，所以先不显示数字。")
+      return unavailable("可检查的历史时段太少，所以暂时无法估计。")
     }
-    guard backtest.string("input") == "ai_semantic_signals" else {
-      return unavailable("当前试算还没把 AI 识别的线索算进去，所以先不显示数字。")
-    }
-    guard backtest.bool("better_than_naive") == true,
-      backtest.bool("better_than_rate_v2") == true
-    else {
-      return unavailable("试算结果没有比简单猜测更准，所以先不显示数字。")
+    guard backtest.bool("better_than_naive") == true else {
+      return unavailable("当前模型没有比简单猜测更准，所以暂时不显示数字。")
     }
     guard let brierScore = backtest.number("brier"), brierScore >= 0, brierScore <= 1,
       let probabilities = forecast.object("probabilities"),
@@ -38,24 +30,33 @@ enum ProbabilityCalibration {
       lower24h <= upper24h,
       lower48h <= upper48h
     else {
-      return unavailable("历史试算数据不完整，所以先不显示数字。")
+      return unavailable("历史估计数据不完整，所以暂时不显示数字。")
     }
 
+    let isCalibrated = backtest.string("status") == "validated"
+      && backtest.string("input") == "ai_semantic_signals"
+      && backtest.bool("better_than_rate_v2") == true
+    let quality: ProbabilityQuality = isCalibrated ? .calibrated : .historicalEstimate
+    let comparison = backtest.bool("better_than_rate_v2") == true
+      ? "比旧模型更准"
+      : "和旧模型接近"
+
     return ProbabilityCalibrationResult(
-      range: CalibratedProbabilityRange(
+      estimate: ProbabilityEstimate(
         lower24h: lower24h,
         upper24h: upper24h,
         lower48h: lower48h,
         upper48h: upper48h,
         sampleSize: sampleSize,
-        brierScore: brierScore
+        brierScore: brierScore,
+        quality: quality
       ),
-      note: "回放了 \(sampleSize) 个过去时段并达到要求，只显示概率范围。"
+      note: "回放了 \(sampleSize) 个过去时段，\(comparison)；AI 新线索单独显示。"
     )
   }
 
   private static func unavailable(_ note: String) -> ProbabilityCalibrationResult {
-    ProbabilityCalibrationResult(range: nil, note: note)
+    ProbabilityCalibrationResult(estimate: nil, note: note)
   }
 
   private static func percent(_ value: Double?) -> Int? {

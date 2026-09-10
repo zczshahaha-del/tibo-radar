@@ -29,8 +29,16 @@ final class AISnapshotStoreTests: XCTestCase {
       analysisNote: "test",
       summary: "test",
       likelyWindow: "test",
-      calibratedProbability: nil,
-      probabilityNote: "历史回测仍在实验中，暂不显示概率。",
+      probabilityEstimate: ProbabilityEstimate(
+        lower24h: 12,
+        upper24h: 37,
+        lower48h: 25,
+        upper48h: 55,
+        sampleSize: 307,
+        brierScore: 0.106,
+        quality: .historicalEstimate
+      ),
+      probabilityNote: "回放了 307 个过去时段，和旧模型接近；AI 新线索单独显示。",
       lastResetAt: nil,
       dataUpdatedAt: nil,
       isStale: false,

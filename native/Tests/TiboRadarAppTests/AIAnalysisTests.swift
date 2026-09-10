@@ -29,8 +29,8 @@ final class AIAnalysisTests: XCTestCase {
     XCTAssertEqual(snapshot.overallSignal, .weak)
     XCTAssertEqual(snapshot.affectedUserSignal, .announced)
     XCTAssertEqual(snapshot.evidence.first?.label, "Tibo 暗示")
-    XCTAssertNil(snapshot.calibratedProbability)
-    XCTAssertEqual(snapshot.probabilityNote, "还没有足够的历史预测记录，所以先不显示数字。")
+    XCTAssertNil(snapshot.probabilityEstimate)
+    XCTAssertEqual(snapshot.probabilityNote, "没有拿到历史回放数据，所以暂时无法估计。")
     XCTAssertFalse(snapshot.isStale)
   }
 
