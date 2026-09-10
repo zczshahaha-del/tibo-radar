@@ -205,7 +205,7 @@ final class RadarViewModel: ObservableObject {
         configuration: AIConfiguration(provider: provider, model: selectedModel),
         apiKey: key
       )
-      settingsMessage = "连接成功，可以生成 AI 预测。"
+      settingsMessage = "连接成功，可以分析最新公开信号。"
     } catch {
       settingsMessage = Self.displayMessage(for: error)
     }
