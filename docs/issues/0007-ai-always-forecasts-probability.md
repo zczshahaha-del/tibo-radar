@@ -49,6 +49,8 @@ v0.4.1 把历史概率范围与 AI 新信号分开显示。AI 只说“没有新
 - 2026-09-11：v0.5.0 Release 构建、启动、2x 视觉快照、压缩包完整性、版本、
   arm64 架构和临时签名复验通过。候选包 SHA-256 为
   `ab8ac8fe5e2db2940b191167eb1f467f86d1bb2bf5fd2063464c86f68ec44d45`。
+- 2026-09-11：用户验收指出，低概率预测旁边直接写“最可能什么时候”会让条件
+  时段看起来像确定日程。v0.5.0 未被接受，不得合并；后续转入 Issue 8。
 - PR：`docs/pull-requests/0007-ai-always-forecasts-probability.md`。
 - Commit：`3aae4eb`。
 - 参考：Issue 3–6。
