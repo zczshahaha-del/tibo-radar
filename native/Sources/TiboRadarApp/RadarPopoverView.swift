@@ -351,7 +351,7 @@ struct RadarPopoverView: View {
   private var footer: some View {
     HStack {
       Label(
-        "\(model.selectedProvider.displayName) · 15 分钟巡检",
+        "\(model.selectedProvider.displayName) · \(AIRefreshSchedule.label)",
         systemImage: "brain.head.profile"
       )
         .font(.caption)

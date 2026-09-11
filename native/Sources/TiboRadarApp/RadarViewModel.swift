@@ -54,7 +54,10 @@ final class RadarViewModel: ObservableObject {
       await self.notifications.prepareAuthorization()
       await self.refresh(force: false)
     }
-    refreshTimer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) {
+    refreshTimer = Timer.scheduledTimer(
+      withTimeInterval: AIRefreshSchedule.automaticInterval,
+      repeats: true
+    ) {
       [weak self] _ in
       Task { @MainActor [weak self] in
         guard self?.hasAPIKey == true else { return }

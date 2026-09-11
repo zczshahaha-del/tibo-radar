@@ -37,7 +37,7 @@ AI 综合历史与近期证据 ──→ 全局 / 普发卡 / 综合 24/48 小�
 - `APIKeyStore.swift`：只通过 macOS 钥匙串保存两家 API Key。
 - `AISnapshotStore.swift`：按供应商保存最近一次成功的 AI 结果。
 - `AIRefreshGate.swift`：资料变化时调用 AI；资料不变时限制后台调用频率。
-- `RadarViewModel.swift`：管理首次加载、手动刷新、15 分钟刷新和状态。
+- `RadarViewModel.swift`：管理首次加载、手动刷新、2 小时自动刷新和状态。
 - `NotificationManager.swift`：负责系统授权、AI 概率阈值和事件去重。
 - `RadarPopoverView.swift`：实现菜单栏弹出面板。
 - `build-app.sh`：构建 Release 二进制并组装、临时签名 `.app`。

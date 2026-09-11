@@ -1,12 +1,17 @@
 import Foundation
 
+enum AIRefreshSchedule {
+  static let automaticInterval: TimeInterval = 2 * 60 * 60
+  static let label = "2 小时巡检"
+}
+
 final class AIRefreshGate: @unchecked Sendable {
   private let defaults: UserDefaults
   private let minimumPeriodicInterval: TimeInterval
 
   init(
     defaults: UserDefaults = .standard,
-    minimumPeriodicInterval: TimeInterval = 60 * 60
+    minimumPeriodicInterval: TimeInterval = AIRefreshSchedule.automaticInterval
   ) {
     self.defaults = defaults
     self.minimumPeriodicInterval = minimumPeriodicInterval
