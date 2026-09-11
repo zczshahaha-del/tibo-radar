@@ -7,7 +7,7 @@ name = "tibo-radar"
 version = "0.1.0"
 description = "A local, explainable forecast radar for Codex goodwill resets."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "ZC" }]
 dependencies = []
@@ -24,4 +24,3 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 tibo_radar = ["static/*"]
-

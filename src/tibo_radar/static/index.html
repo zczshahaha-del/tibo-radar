@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Tibo Radar</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">CODEX GOODWILL RESET FORECAST</p>
+        <h1>Tibo Radar <span aria-hidden="true">◉</span></h1>
+        <p class="subtitle">判断什么时候该提前开蹬，而不是等重置落地。</p>
+      </div>
+      <button id="refresh" type="button">刷新信号</button>
+    </header>
+
+    <section class="hero" data-level="loading" id="hero">
+      <div class="hero-copy">
+        <p class="status-line"><span class="pulse"></span><span id="level-label">正在读取公开信号</span></p>
+        <p class="hero-number"><span id="combined-24">--</span><small>%</small></p>
+        <p class="hero-caption">未来 24 小时出现全局重置或普发重置卡</p>
+      </div>
+      <div class="hero-side">
+        <div><span>48 小时综合概率</span><strong id="combined-48">--%</strong></div>
+        <div><span>历史高发时段</span><strong id="likely-window">--</strong></div>
+        <div><span>模型置信度</span><strong id="confidence">--</strong></div>
+      </div>
+    </section>
+
+    <section class="cards" aria-label="分类预测">
+      <article class="card">
+        <div class="card-heading"><span>01</span><h2>全局重置</h2></div>
+        <div class="metric"><strong id="global-24">--%</strong><span>24 小时</span></div>
+        <div class="bar"><i id="global-bar"></i></div>
+        <p>直接恢复大范围用户的周额度。</p>
+        <footer>48 小时 <b id="global-48">--%</b></footer>
+      </article>
+      <article class="card">
+        <div class="card-heading"><span>02</span><h2>普发重置卡</h2></div>
+        <div class="metric"><strong id="banked-24">--%</strong><span>24 小时</span></div>
+        <div class="bar"><i id="banked-bar"></i></div>
+        <p>发到账户、可以以后手动使用的 banked reset。</p>
+        <footer>48 小时 <b id="banked-48">--%</b></footer>
+      </article>
+      <article class="card conditional" id="conditional-card" hidden>
+        <div class="card-heading"><span>IF</span><h2>故障补发</h2></div>
+        <div class="metric"><strong id="affected-24">--%</strong><span>24 小时</span></div>
+        <div class="bar"><i id="affected-bar"></i></div>
+        <p>仅适用于在明确故障时段内受影响的用户。</p>
+        <footer>这是条件概率，不代表普发</footer>
+      </article>
+    </section>
+
+    <section class="split">
+      <article class="panel">
+        <div class="panel-title"><h2>为什么是这个概率</h2><span id="freshness">--</span></div>
+        <ol class="evidence" id="evidence"></ol>
+      </article>
+      <article class="panel">
+        <div class="panel-title"><h2>最近的公开信号</h2><span>点击查看来源</span></div>
+        <ol class="events" id="events"></ol>
+      </article>
+    </section>
+
+    <aside class="notice" id="notice" hidden></aside>
+    <footer class="page-footer">
+      <span>只读公开信息 · 不登录账户 · 不自动兑换</span>
+      <span id="generated-at">--</span>
+    </footer>
+  </main>
+  <script src="/app.js" defer></script>
+</body>
+</html>
+
