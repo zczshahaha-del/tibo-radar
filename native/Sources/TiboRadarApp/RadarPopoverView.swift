@@ -4,6 +4,11 @@ import SwiftUI
 struct RadarPopoverView: View {
   @EnvironmentObject private var model: RadarViewModel
   @State private var showingSettings = false
+  @State private var showingDetails = false
+
+  init(initiallyShowingDetails: Bool = false) {
+    _showingDetails = State(initialValue: initiallyShowingDetails)
+  }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -23,7 +28,7 @@ struct RadarPopoverView: View {
         VStack(spacing: 12) {
           hero(snapshot)
           categories(snapshot)
-          evidence(snapshot)
+          explanation(snapshot)
           if !snapshot.sourceErrors.isEmpty {
             sourceWarning(snapshot)
           }
@@ -39,8 +44,9 @@ struct RadarPopoverView: View {
         .padding(.vertical, 13)
         .background(.black.opacity(0.12))
     }
-    .frame(width: 390, height: 660)
+    .frame(width: 390, height: popoverHeight)
     .background(.ultraThinMaterial)
+    .animation(.easeInOut(duration: 0.18), value: popoverHeight)
   }
 
   private var header: some View {
@@ -237,10 +243,10 @@ struct RadarPopoverView: View {
     .padding(.vertical, 11)
   }
 
-  private func evidence(_ snapshot: PredictionSnapshot) -> some View {
+  private func explanation(_ snapshot: PredictionSnapshot) -> some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
-        Text("AI 为什么这么预测")
+        Text("关键原因")
           .font(.system(size: 12, weight: .bold))
         Spacer()
         if snapshot.isStale {
@@ -251,15 +257,44 @@ struct RadarPopoverView: View {
       }
 
       Text(snapshot.analysisNote)
-        .font(.system(size: 10))
+        .font(.system(size: 11))
         .foregroundStyle(.secondary)
-        .lineLimit(3)
+        .lineLimit(showingDetails ? 4 : 2)
         .fixedSize(horizontal: false, vertical: true)
 
+      Button {
+        withAnimation(.easeInOut(duration: 0.18)) {
+          showingDetails.toggle()
+        }
+      } label: {
+        HStack(spacing: 6) {
+          Text(showingDetails ? "收起详细依据" : "查看详细依据")
+          Spacer()
+          Image(systemName: showingDetails ? "chevron.up" : "chevron.down")
+            .font(.system(size: 9, weight: .semibold))
+        }
+        .font(.system(size: 10, weight: .semibold))
+        .foregroundStyle(.secondary)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(showingDetails ? "收起详细依据" : "查看详细依据")
+
+      if showingDetails {
+        detailedEvidence(snapshot)
+          .transition(.opacity.combined(with: .move(edge: .top)))
+      }
+    }
+    .padding(14)
+    .background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 15))
+  }
+
+  private func detailedEvidence(_ snapshot: PredictionSnapshot) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
       Divider()
 
       VStack(alignment: .leading, spacing: 3) {
-        Text("AI 参考了什么")
+        Text("历史基准")
           .font(.system(size: 10, weight: .semibold))
           .foregroundStyle(.tertiary)
         Text(snapshot.baselineNote)
@@ -268,47 +303,47 @@ struct RadarPopoverView: View {
           .lineLimit(2)
       }
 
-      Divider()
+      if !snapshot.evidence.isEmpty {
+        Divider()
 
-      Text("主要依据")
-        .font(.system(size: 10, weight: .semibold))
-        .foregroundStyle(.tertiary)
+        Text("证据")
+          .font(.system(size: 10, weight: .semibold))
+          .foregroundStyle(.tertiary)
 
-      ForEach(snapshot.evidence.prefix(2)) { item in
-        HStack(alignment: .top, spacing: 9) {
-          Circle()
-            .fill(evidenceColor(item.category))
-            .frame(width: 6, height: 6)
-            .padding(.top, 5)
-          VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 5) {
-              Text(item.label)
-                .font(.system(size: 11, weight: .semibold))
-              if item.delta != 0 {
-                Text(item.delta > 0 ? "+\(item.delta)" : "\(item.delta)")
-                  .font(.system(size: 9, weight: .bold))
-                  .foregroundStyle(item.delta > 0 ? .green : .red)
+        ForEach(snapshot.evidence.prefix(2)) { item in
+          HStack(alignment: .top, spacing: 9) {
+            Circle()
+              .fill(evidenceColor(item.category))
+              .frame(width: 6, height: 6)
+              .padding(.top, 5)
+            VStack(alignment: .leading, spacing: 2) {
+              HStack(spacing: 5) {
+                Text(item.label)
+                  .font(.system(size: 11, weight: .semibold))
+                if item.delta != 0 {
+                  Text(item.delta > 0 ? "+\(item.delta)" : "\(item.delta)")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(item.delta > 0 ? .green : .red)
+                }
               }
+              Text(item.detail)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
             }
-            Text(item.detail)
-              .font(.system(size: 10))
-              .foregroundStyle(.secondary)
-              .lineLimit(2)
-          }
-          Spacer(minLength: 0)
-          if let sourceURL = item.sourceURL {
-            Link(destination: sourceURL) {
-              Image(systemName: "arrow.up.right")
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.tertiary)
+            Spacer(minLength: 0)
+            if let sourceURL = item.sourceURL {
+              Link(destination: sourceURL) {
+                Image(systemName: "arrow.up.right")
+                  .font(.system(size: 9, weight: .semibold))
+                  .foregroundStyle(.tertiary)
+              }
+              .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
           }
         }
       }
     }
-    .padding(14)
-    .background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 15))
   }
 
   private func sourceWarning(_ snapshot: PredictionSnapshot) -> some View {
@@ -379,6 +414,15 @@ struct RadarPopoverView: View {
     if model.isRefreshing { return "AI 正在判断" }
     if !model.hasAPIKey { return "需要 API Key" }
     return "AI 概率预测已启用"
+  }
+
+  private var popoverHeight: CGFloat {
+    if showingSettings { return 660 }
+    guard let snapshot = model.snapshot else { return 520 }
+    var height: CGFloat = showingDetails ? 660 : 520
+    if snapshot.affectedUserBanked24h != nil { height += 50 }
+    if !snapshot.sourceErrors.isEmpty { height += 46 }
+    return height
   }
 
   private func levelColor(_ probability: Int) -> Color {

@@ -68,6 +68,23 @@ final class VisualRenderTests: XCTestCase {
     let view = RadarPopoverView()
       .environmentObject(model)
       .preferredColorScheme(.dark)
+    try render(view, size: CGSize(width: 390, height: 570), to: outputPath)
+  }
+
+  @MainActor
+  func testRenderExpandedEvidenceWhenRequested() throws {
+    guard
+      let outputPath = ProcessInfo.processInfo.environment[
+        "TIBO_RADAR_EXPANDED_RENDER_PATH"
+      ]
+    else {
+      throw XCTSkip("Set TIBO_RADAR_EXPANDED_RENDER_PATH to render expanded evidence")
+    }
+
+    let model = RadarViewModel(previewSnapshot: previewSnapshot())
+    let view = RadarPopoverView(initiallyShowingDetails: true)
+      .environmentObject(model)
+      .preferredColorScheme(.dark)
     try render(view, size: CGSize(width: 390, height: 660), to: outputPath)
   }
 
@@ -147,7 +164,20 @@ final class VisualRenderTests: XCTestCase {
       lastResetAt: nil,
       dataUpdatedAt: Date(),
       isStale: false,
-      evidence: [],
+      evidence: [
+        Evidence(
+          id: "preview-signal",
+          label: "Tibo 近期言论",
+          detail: "原帖语气指向未来，但没有明确承诺具体福利。",
+          category: "positive"
+        ),
+        Evidence(
+          id: "preview-counter",
+          label: "缺少明确时间",
+          detail: "暂未找到面向所有用户的明确日期。",
+          category: "negative"
+        ),
+      ],
       latestEvents: [],
       sourceErrors: []
     )
