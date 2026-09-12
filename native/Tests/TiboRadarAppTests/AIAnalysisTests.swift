@@ -89,7 +89,58 @@ final class AIAnalysisTests: XCTestCase {
 
     XCTAssertTrue(context.contains("last_reset_at"))
     XCTAssertTrue(context.contains("recent_tibo_feed"))
+    XCTAssertTrue(context.contains("recent_tibo_posts"))
     XCTAssertTrue(context.contains("rounded_24h"))
+  }
+
+  func testInputContextPreservesTiboPostEndingBeyondTruncatedSummary() throws {
+    var source = bundle()
+    source.payloads[.feed] = .object([
+      "updated_at": .string("2026-09-12T03:21:00Z"),
+      "events": .array([
+        .object([
+          "id": .string("2098612714704891959"),
+          "summary": .string("Hi Astra users. A reset and a quick update on quality issues."),
+          "announced_at": .string("2026-09-12T03:20:36Z"),
+          "announcement_state": .string("none"),
+        ])
+      ]),
+      "tweets": .array([
+        .object([
+          "id": .string("2098612714704891959"),
+          "at": .string("2026-09-12T03:20:36Z"),
+          "text": .string(
+            "Hi Astra users. A reset and a quick update on quality issues. "
+              + "More details about the fixes.\n\n"
+              + "And of course, a reset is also landing by midnight today."
+          ),
+          "url": .string("https://x.com/thsottiaux/status/2098612714704891959"),
+          "explicit_reset_claim": .bool(false),
+        ])
+      ]),
+    ])
+
+    let context = try AIInputBuilder.makeContext(bundle: source)
+    let data = try XCTUnwrap(context.data(using: .utf8))
+    let root = try XCTUnwrap(
+      try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+    let posts = try XCTUnwrap(root["recent_tibo_posts"] as? [[String: Any]])
+    let feed = try XCTUnwrap(root["recent_tibo_feed"] as? [[String: Any]])
+
+    XCTAssertEqual(posts.first?["id"] as? String, "2098612714704891959")
+    XCTAssertEqual(
+      posts.first?["text"] as? String,
+      "Hi Astra users. A reset and a quick update on quality issues. "
+        + "More details about the fixes.\n\n"
+        + "And of course, a reset is also landing by midnight today."
+    )
+    XCTAssertEqual(
+      posts.first?["closing_paragraph"] as? String,
+      "And of course, a reset is also landing by midnight today."
+    )
+    XCTAssertNil(posts.first?["explicit_reset_claim"])
+    XCTAssertNil(feed.first?["announcement_state"])
   }
 
   private func makeAnalysis() -> AIAnalysis {
@@ -159,6 +210,7 @@ final class AIAnalysisTests: XCTestCase {
               "observed_at": .string("2026-09-10T11:00:00Z"),
             ])
           ]),
+          "tweets": .array([]),
         ]),
       ],
       cacheFallbacks: [],

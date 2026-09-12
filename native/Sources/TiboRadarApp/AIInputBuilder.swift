@@ -35,7 +35,15 @@ enum AIInputBuilder {
       context["historical_events"] = trimmedArray(timeline["events"], limit: 40)
     }
     if let feed = bundle.payloads[.feed]?.objectValue {
-      context["recent_tibo_feed"] = trimmedArray(feed["events"], limit: 40)
+      context["recent_tibo_feed"] = trimmedObjects(
+        feed["events"],
+        limit: 40,
+        selecting: [
+          "id", "announced_at", "observed_at", "effective_at", "summary", "text",
+          "url", "source_label", "source",
+        ]
+      )
+      context["recent_tibo_posts"] = recentTiboPosts(feed["tweets"], limit: 12)
     }
     if let status = bundle.payloads[.status]?.objectValue {
       context["aggregated_status_incidents"] = trimmedArray(status["incidents"], limit: 15)
@@ -71,6 +79,55 @@ enum AIInputBuilder {
   private static func trimmedArray(_ value: JSONValue?, limit: Int) -> [Any] {
     guard let values = value?.arrayValue else { return [] }
     return values.prefix(limit).map(foundationValue)
+  }
+
+  private static func trimmedObjects(
+    _ value: JSONValue?,
+    limit: Int,
+    selecting keys: [String]
+  ) -> [[String: Any]] {
+    guard let values = value?.arrayValue else { return [] }
+    return values.prefix(limit).compactMap { value in
+      guard let object = value.objectValue else { return nil }
+      return jsonObject(selecting: keys, from: object)
+    }
+  }
+
+  private static func recentTiboPosts(
+    _ value: JSONValue?,
+    limit: Int
+  ) -> [[String: Any]] {
+    guard let values = value?.arrayValue else { return [] }
+    return values.prefix(limit).compactMap { value in
+      guard let post = value.objectValue else { return nil }
+      var result = jsonObject(
+        selecting: [
+          "id", "at", "declared_at", "text", "url", "is_reply",
+          "in_reply_to_tweet_id",
+        ],
+        from: post
+      )
+      if let text = post.string("text") {
+        result["text"] = boundedPostText(text)
+        result["closing_paragraph"] = closingParagraph(text)
+      }
+      return result
+    }
+  }
+
+  private static func closingParagraph(_ text: String) -> String {
+    let paragraphs = text.components(separatedBy: "\n\n")
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+    return String((paragraphs.last ?? text).suffix(2_000))
+  }
+
+  private static func boundedPostText(_ text: String) -> String {
+    let maximumCharacters = 6_000
+    guard text.count > maximumCharacters else { return text }
+    return String(text.prefix(4_000))
+      + "\n[…中间内容已压缩，保留帖子末尾…]\n"
+      + String(text.suffix(2_000))
   }
 
   private static func foundationValue(_ value: JSONValue) -> Any {

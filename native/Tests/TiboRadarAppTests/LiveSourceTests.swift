@@ -18,6 +18,7 @@ final class LiveSourceTests: XCTestCase {
     XCTAssertNotNil(bundle.payloads[.timeline])
     XCTAssertFalse(metadata.latestEvents.isEmpty)
     XCTAssertTrue(context.contains("recent_tibo_feed"))
+    XCTAssertTrue(context.contains("recent_tibo_posts"))
     XCTAssertTrue(context.contains("rounded_24h"))
   }
 }
