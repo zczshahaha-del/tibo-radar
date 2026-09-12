@@ -67,6 +67,9 @@ final class AIProviderClientTests: XCTestCase {
     XCTAssertFalse(requestText.contains("\"likely_window\""))
     XCTAssertTrue(requestText.contains("你必须每次都预测"))
     XCTAssertTrue(requestText.contains("没有新信号时，概率应保留在合理的历史基准附近"))
+    XCTAssertTrue(requestText.contains("以 recent_tibo_posts.text 为准"))
+    XCTAssertTrue(requestText.contains("不能把尚未到期的明确承诺压回普通历史基准"))
+    XCTAssertTrue(requestText.contains("不等于已经完成的 “landed”"))
   }
 
   func testDeepSeekUsesCollectedSourcesWithoutClaimingSearch() async throws {
