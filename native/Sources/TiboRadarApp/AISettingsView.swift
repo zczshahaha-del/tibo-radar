@@ -2,7 +2,6 @@ import SwiftUI
 
 struct AISettingsView: View {
   @EnvironmentObject private var model: RadarViewModel
-  let onDone: () -> Void
 
   @State private var provider = AIProvider.deepSeek
   @State private var modelName = AIProvider.deepSeek.defaultModel
@@ -10,58 +9,46 @@ struct AISettingsView: View {
   @State private var showingDeleteConfirmation = false
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 15) {
-      HStack {
-        VStack(alignment: .leading, spacing: 3) {
-          Text("AI 模型设置")
-            .font(.system(size: 16, weight: .bold))
-          Text("使用你自己的 API Key")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        Spacer()
-        Image(systemName: "lock.shield.fill")
-          .foregroundStyle(.green)
+    VStack(alignment: .leading, spacing: 0) {
+      VStack(alignment: .leading, spacing: 4) {
+        fieldLabel("模型服务")
+        providerSelector
       }
 
-      Picker("模型服务", selection: $provider) {
-        ForEach(AIProvider.allCases) { provider in
-          Text(provider.displayName).tag(provider)
-        }
-      }
-      .pickerStyle(.segmented)
+      Spacer()
+        .frame(height: 26)
 
-      VStack(alignment: .leading, spacing: 7) {
-        Text("模型名称")
-          .font(.caption.weight(.semibold))
+      VStack(alignment: .leading, spacing: 4) {
+        fieldLabel("模型名称")
         TextField(provider.defaultModel, text: $modelName)
+          .font(.system(size: 13))
           .textFieldStyle(.roundedBorder)
+          .controlSize(.regular)
+          .frame(height: 30)
       }
 
-      VStack(alignment: .leading, spacing: 7) {
-        HStack {
-          Text("API Key")
-            .font(.caption.weight(.semibold))
+      Spacer()
+        .frame(height: 26)
+
+      VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 6) {
+          fieldLabel("API Key")
           Spacer()
           if model.keyIsSaved(for: provider) {
-            Label("钥匙串已保存", systemImage: "checkmark.circle.fill")
-              .font(.caption2.weight(.semibold))
+            Label("已保存", systemImage: "checkmark.circle.fill")
+              .font(.system(size: 10, weight: .medium))
               .foregroundStyle(.green)
           }
         }
         SecureField(
-          model.keyIsSaved(for: provider) ? "留空表示继续使用已保存 Key" : "粘贴 API Key",
+          model.keyIsSaved(for: provider) ? "留空继续使用已保存 Key" : "粘贴 API Key",
           text: $apiKey
         )
+        .font(.system(size: 13))
         .textFieldStyle(.roundedBorder)
+        .controlSize(.regular)
+        .frame(height: 30)
       }
-
-      Text(provider.capabilityNote)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 10))
 
       if let message = model.settingsMessage {
         Label(
@@ -69,25 +56,32 @@ struct AISettingsView: View {
           systemImage: message.contains("成功") || message.contains("已保存")
             ? "checkmark.circle" : "info.circle"
         )
-        .font(.caption)
+        .font(.system(size: 11))
         .foregroundStyle(
           message.contains("成功") || message.contains("已保存") ? .green : .orange
         )
         .fixedSize(horizontal: false, vertical: true)
+        .padding(.top, 8)
       }
 
-      Spacer(minLength: 0)
+      Spacer()
+        .frame(height: 26)
 
-      HStack {
+      Divider()
+
+      HStack(spacing: 8) {
         if model.keyIsSaved(for: provider) {
           Button("删除 Key", role: .destructive) {
             showingDeleteConfirmation = true
           }
-          .buttonStyle(.borderless)
-          .font(.caption)
+          .buttonStyle(.plain)
+          .font(.system(size: 11))
+          .foregroundStyle(.secondary)
         }
+
         Spacer()
-        Button("保存") {
+
+        Button("仅保存") {
           _ = model.saveSettings(
             provider: provider,
             model: modelName,
@@ -95,7 +89,11 @@ struct AISettingsView: View {
           )
           apiKey = ""
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.plain)
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 8)
+        .frame(height: 28)
 
         Button {
           Task {
@@ -108,28 +106,24 @@ struct AISettingsView: View {
           }
         } label: {
           if model.isTestingConnection {
-            ProgressView().controlSize(.small)
+            ProgressView()
+              .controlSize(.small)
+              .frame(minWidth: 64)
           } else {
             Text("保存并测试")
+              .font(.system(size: 12, weight: .medium))
           }
         }
         .buttonStyle(.borderedProminent)
+        .controlSize(.regular)
+        .tint(.green)
         .disabled(model.isTestingConnection)
       }
-
-      HStack {
-        Text("Key 只存于本机 macOS 钥匙串，不写入缓存或日志。")
-          .font(.system(size: 9))
-          .foregroundStyle(.tertiary)
-        Spacer()
-        Button("完成") { onDone() }
-          .buttonStyle(.borderless)
-          .font(.caption.weight(.semibold))
-      }
+      .padding(.top, 10)
     }
-    .padding(15)
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(.white.opacity(0.025), in: RoundedRectangle(cornerRadius: 16))
+    .padding(.horizontal, 18)
+    .padding(.top, 14)
+    .padding(.bottom, 14)
     .onAppear {
       provider = model.selectedProvider
       modelName = model.modelName(for: provider)
@@ -148,5 +142,42 @@ struct AISettingsView: View {
       }
       Button("取消", role: .cancel) {}
     }
+  }
+
+  private func fieldLabel(_ text: String) -> some View {
+    Text(text)
+      .font(.system(size: 11, weight: .semibold))
+      .foregroundStyle(.secondary)
+  }
+
+  private var providerSelector: some View {
+    HStack(spacing: 2) {
+      ForEach(AIProvider.allCases) { option in
+        Button {
+          provider = option
+        } label: {
+          Text(option.displayName)
+            .font(.system(size: 13, weight: provider == option ? .semibold : .regular))
+            .foregroundStyle(provider == option ? Color.white : Color.primary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 5)
+            .contentShape(Rectangle())
+            .background(
+              provider == option ? Color.green : Color.clear,
+              in: RoundedRectangle(cornerRadius: 7)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(provider == option ? .isSelected : [])
+      }
+    }
+    .padding(2)
+    .frame(height: 30)
+    .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
+    .overlay {
+      RoundedRectangle(cornerRadius: 9)
+        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+    }
+    .animation(.easeInOut(duration: 0.12), value: provider)
   }
 }

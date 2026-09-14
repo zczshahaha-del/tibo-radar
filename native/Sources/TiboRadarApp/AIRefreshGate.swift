@@ -2,7 +2,7 @@ import Foundation
 
 enum AIRefreshSchedule {
   static let automaticInterval: TimeInterval = 2 * 60 * 60
-  static let label = "2 小时巡检"
+  static let label = "每 2 小时检查"
 }
 
 final class AIRefreshGate: @unchecked Sendable {

@@ -67,8 +67,25 @@ final class VisualRenderTests: XCTestCase {
     let model = RadarViewModel(previewSnapshot: snapshot)
     let view = RadarPopoverView()
       .environmentObject(model)
-      .preferredColorScheme(.dark)
-    try render(view, size: CGSize(width: 390, height: 660), to: outputPath)
+      .environment(\.colorScheme, .dark)
+    try render(view, size: CGSize(width: 344, height: 350), to: outputPath)
+  }
+
+  @MainActor
+  func testRenderExpandedEvidenceWhenRequested() throws {
+    guard
+      let outputPath = ProcessInfo.processInfo.environment[
+        "TIBO_RADAR_EXPANDED_RENDER_PATH"
+      ]
+    else {
+      throw XCTSkip("Set TIBO_RADAR_EXPANDED_RENDER_PATH to render expanded evidence")
+    }
+
+    let model = RadarViewModel(previewSnapshot: previewSnapshot())
+    let view = RadarPopoverView(initiallyShowingDetails: true)
+      .environmentObject(model)
+      .environment(\.colorScheme, .dark)
+    try render(view, size: CGSize(width: 344, height: 575), to: outputPath)
   }
 
   @MainActor
@@ -82,21 +99,10 @@ final class VisualRenderTests: XCTestCase {
     }
 
     let model = RadarViewModel(previewSnapshot: previewSnapshot())
-    let view = VStack(spacing: 0) {
-      Text("Tibo Radar")
-        .font(.headline)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-      AISettingsView(onDone: {})
-        .environmentObject(model)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 14)
-      Spacer(minLength: 0)
-    }
-    .frame(width: 390, height: 660)
-    .background(.ultraThinMaterial)
-    .preferredColorScheme(.dark)
-    try render(view, size: CGSize(width: 390, height: 660), to: outputPath)
+    let view = RadarPopoverView(initiallyShowingSettings: true)
+      .environmentObject(model)
+      .environment(\.colorScheme, .dark)
+    try render(view, size: CGSize(width: 344, height: 350), to: outputPath)
   }
 
   @MainActor
@@ -147,7 +153,28 @@ final class VisualRenderTests: XCTestCase {
       lastResetAt: nil,
       dataUpdatedAt: Date(),
       isStale: false,
-      evidence: [],
+      evidence: [
+        Evidence(
+          id: "preview-signal",
+          label: "上一轮重置刚完成",
+          detail: "Tibo 约 7 小时前确认重置已经传播完毕，短时间内再次重置的可能性下降。",
+          category: "negative",
+          sourceURL: URL(string: "https://x.com/tibo_maker")
+        ),
+        Evidence(
+          id: "preview-counter",
+          label: "没有新的未来预告",
+          detail: "近期 Tibo 原文没有再次承诺重置额度，也没有面向所有用户的重置卡消息。",
+          category: "negative",
+          sourceURL: URL(string: "https://x.com/tibo_maker")
+        ),
+        Evidence(
+          id: "preview-history",
+          label: "48 小时仍保留历史机会",
+          detail: "预测窗口变长后，历史上自然发生重置或发卡的累计概率会升高。",
+          category: "context"
+        ),
+      ],
       latestEvents: [],
       sourceErrors: []
     )
