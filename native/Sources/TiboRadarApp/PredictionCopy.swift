@@ -1,6 +1,26 @@
 import Foundation
 
 enum PredictionCopy {
+  static func lastRefresh(
+    _ date: Date,
+    now: Date = Date(),
+    calendar: Calendar = .current
+  ) -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = calendar
+    formatter.locale = Locale(identifier: "zh_CN")
+    formatter.timeZone = calendar.timeZone
+
+    if calendar.isDate(date, inSameDayAs: now) {
+      formatter.dateFormat = "HH:mm"
+    } else if calendar.component(.year, from: date) == calendar.component(.year, from: now) {
+      formatter.dateFormat = "M月d日 HH:mm"
+    } else {
+      formatter.dateFormat = "yyyy年M月d日 HH:mm"
+    }
+    return "上次刷新 \(formatter.string(from: date))"
+  }
+
   static func conditionalWindow(_ rawValue: String) -> String {
     var value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
     let unavailableTerms = [
