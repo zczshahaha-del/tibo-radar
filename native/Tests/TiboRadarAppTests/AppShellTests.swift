@@ -13,7 +13,7 @@ final class AppShellTests: XCTestCase {
 
     controller.resize(to: RadarPopoverView.expandedHeight)
 
-    XCTAssertTrue(popover.animates)
+    XCTAssertFalse(popover.animates)
     XCTAssertEqual(popover.contentSize.width, 344)
     XCTAssertEqual(popover.contentSize.height, 575)
     XCTAssertEqual(contentController.preferredContentSize.width, 344)

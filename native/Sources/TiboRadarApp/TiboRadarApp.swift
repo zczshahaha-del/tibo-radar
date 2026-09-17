@@ -72,7 +72,7 @@ final class RadarPopoverController {
   init(popover: NSPopover = NSPopover()) {
     self.popover = popover
     popover.behavior = .transient
-    popover.animates = true
+    popover.animates = false
   }
 
   func install(_ contentViewController: NSViewController) {

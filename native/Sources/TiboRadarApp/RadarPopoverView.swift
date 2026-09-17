@@ -2,7 +2,6 @@ import SwiftUI
 
 struct RadarPopoverView: View {
   @EnvironmentObject private var model: RadarViewModel
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var showingSettings = false
   @State private var showingDetails = false
   private let onPreferredHeightChange: (CGFloat) -> Void
@@ -32,7 +31,6 @@ struct RadarPopoverView: View {
         footer
         if showingDetails {
           detailedEvidence(snapshot)
-            .transition(.opacity)
         }
       } else {
         loading
@@ -327,9 +325,7 @@ struct RadarPopoverView: View {
 
   private func toggleDetails() {
     let nextValue = !showingDetails
-    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-      showingDetails = nextValue
-    }
+    showingDetails = nextValue
     onPreferredHeightChange(
       Self.preferredHeight(
         showingSettings: showingSettings,
