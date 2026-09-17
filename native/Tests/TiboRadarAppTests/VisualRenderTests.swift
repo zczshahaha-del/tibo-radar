@@ -6,6 +6,32 @@ import XCTest
 
 final class VisualRenderTests: XCTestCase {
   @MainActor
+  func testPopoverUsesExplicitHeightForEveryPage() throws {
+    XCTAssertEqual(
+      RadarPopoverView.preferredHeight(showingSettings: false, showingDetails: false),
+      350
+    )
+    XCTAssertEqual(
+      RadarPopoverView.preferredHeight(showingSettings: true, showingDetails: false),
+      350
+    )
+    XCTAssertEqual(
+      RadarPopoverView.preferredHeight(showingSettings: false, showingDetails: true),
+      575
+    )
+
+    let model = RadarViewModel(previewSnapshot: previewSnapshot())
+    let expandedView = RadarPopoverView(initiallyShowingDetails: true)
+      .environmentObject(model)
+    let renderer = ImageRenderer(content: expandedView)
+    renderer.scale = 1
+    let image = try XCTUnwrap(renderer.nsImage)
+
+    XCTAssertEqual(image.size.width, 344, accuracy: 0.5)
+    XCTAssertEqual(image.size.height, 575, accuracy: 0.5)
+  }
+
+  @MainActor
   func testRenderPopoverWhenRequested() throws {
     guard
       let outputPath = ProcessInfo.processInfo.environment[

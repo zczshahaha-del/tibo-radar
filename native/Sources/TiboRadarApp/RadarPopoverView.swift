@@ -36,7 +36,7 @@ struct RadarPopoverView: View {
       }
     }
     .frame(width: 344)
-    .frame(height: compactPanelHeight, alignment: .top)
+    .frame(height: panelHeight, alignment: .top)
     .background(.ultraThinMaterial)
   }
 
@@ -305,8 +305,18 @@ struct RadarPopoverView: View {
     return .secondary
   }
 
-  private var compactPanelHeight: CGFloat? {
-    showingSettings || !showingDetails ? 350 : nil
+  private var panelHeight: CGFloat {
+    Self.preferredHeight(
+      showingSettings: showingSettings,
+      showingDetails: showingDetails
+    )
+  }
+
+  static func preferredHeight(
+    showingSettings: Bool,
+    showingDetails: Bool
+  ) -> CGFloat {
+    showingSettings || !showingDetails ? 350 : 575
   }
 
   private func evidenceColor(_ category: String) -> Color {
