@@ -5,13 +5,16 @@ struct RadarPopoverView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var showingSettings = false
   @State private var showingDetails = false
+  private let onPreferredHeightChange: (CGFloat) -> Void
 
   init(
     initiallyShowingDetails: Bool = false,
-    initiallyShowingSettings: Bool = false
+    initiallyShowingSettings: Bool = false,
+    onPreferredHeightChange: @escaping (CGFloat) -> Void = { _ in }
   ) {
     _showingDetails = State(initialValue: initiallyShowingDetails)
     _showingSettings = State(initialValue: initiallyShowingSettings)
+    self.onPreferredHeightChange = onPreferredHeightChange
   }
 
   var body: some View {
@@ -22,19 +25,21 @@ struct RadarPopoverView: View {
         AISettingsView()
         .environmentObject(model)
       } else if let snapshot = model.snapshot {
-        if showingDetails {
-          evidencePage(snapshot)
-        } else {
-          forecast(snapshot)
+        forecast(snapshot)
+        if !showingDetails {
           Spacer(minLength: 0)
         }
         footer
+        if showingDetails {
+          detailedEvidence(snapshot)
+            .transition(.opacity)
+        }
       } else {
         loading
       }
     }
-    .frame(width: 344)
-    .frame(height: Self.panelHeight, alignment: .top)
+    .frame(width: Self.panelWidth)
+    .frame(height: panelHeight, alignment: .top)
     .background(.ultraThinMaterial)
   }
 
@@ -61,7 +66,7 @@ struct RadarPopoverView: View {
 
       HStack(spacing: 2) {
         Button {
-          showingSettings.toggle()
+          toggleSettings()
         } label: {
           Image(systemName: showingSettings ? "chevron.left" : "gearshape")
             .font(.system(size: 13, weight: .medium))
@@ -164,35 +169,26 @@ struct RadarPopoverView: View {
       Spacer()
 
       Button {
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-          showingDetails.toggle()
-        }
+        toggleDetails()
       } label: {
         HStack(spacing: 5) {
-          Text(showingDetails ? "返回预测" : "详细依据")
+          Text(showingDetails ? "收起依据" : "详细依据")
             .contentTransition(.opacity)
-          Image(systemName: showingDetails ? "chevron.left" : "chevron.down")
+          Image(systemName: "chevron.down")
             .font(.system(size: 8, weight: .semibold))
+            .rotationEffect(showingDetails ? .degrees(180) : .zero)
         }
         .font(.system(size: 10, weight: .medium))
         .frame(height: 30)
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
-      .accessibilityLabel(showingDetails ? "返回预测" : "查看详细依据")
+      .accessibilityLabel(showingDetails ? "收起详细依据" : "查看详细依据")
     }
     .padding(.horizontal, 16)
     .frame(height: 44)
     .background(Color.primary.opacity(0.035))
     .overlay(alignment: .top) { Divider() }
-  }
-
-  private func evidencePage(_ snapshot: PredictionSnapshot) -> some View {
-    VStack(spacing: 0) {
-      detailedEvidence(snapshot)
-      Spacer(minLength: 0)
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   private func detailedEvidence(_ snapshot: PredictionSnapshot) -> some View {
@@ -288,6 +284,7 @@ struct RadarPopoverView: View {
       if !model.hasAPIKey {
         Button("打开 AI 设置") {
           showingSettings = true
+          onPreferredHeightChange(Self.compactHeight)
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.small)
@@ -310,7 +307,47 @@ struct RadarPopoverView: View {
     return .secondary
   }
 
-  static let panelHeight: CGFloat = 350
+  private var panelHeight: CGFloat {
+    Self.preferredHeight(
+      showingSettings: showingSettings,
+      showingDetails: showingDetails
+    )
+  }
+
+  private func toggleSettings() {
+    let nextValue = !showingSettings
+    showingSettings = nextValue
+    onPreferredHeightChange(
+      Self.preferredHeight(
+        showingSettings: nextValue,
+        showingDetails: showingDetails
+      )
+    )
+  }
+
+  private func toggleDetails() {
+    let nextValue = !showingDetails
+    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+      showingDetails = nextValue
+    }
+    onPreferredHeightChange(
+      Self.preferredHeight(
+        showingSettings: showingSettings,
+        showingDetails: nextValue
+      )
+    )
+  }
+
+  static let panelWidth: CGFloat = 344
+  static let compactHeight: CGFloat = 350
+  static let expandedHeight: CGFloat = 575
+
+  static func preferredHeight(
+    showingSettings: Bool,
+    showingDetails: Bool
+  ) -> CGFloat {
+    showingSettings || !showingDetails ? compactHeight : expandedHeight
+  }
 
   private func evidenceColor(_ category: String) -> Color {
     switch category {
