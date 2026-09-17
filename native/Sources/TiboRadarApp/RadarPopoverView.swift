@@ -22,21 +22,19 @@ struct RadarPopoverView: View {
         AISettingsView()
         .environmentObject(model)
       } else if let snapshot = model.snapshot {
-        forecast(snapshot)
-        if !showingDetails {
+        if showingDetails {
+          evidencePage(snapshot)
+        } else {
+          forecast(snapshot)
           Spacer(minLength: 0)
         }
         footer
-        if showingDetails {
-          detailedEvidence(snapshot)
-            .transition(.opacity)
-        }
       } else {
         loading
       }
     }
     .frame(width: 344)
-    .frame(height: panelHeight, alignment: .top)
+    .frame(height: Self.panelHeight, alignment: .top)
     .background(.ultraThinMaterial)
   }
 
@@ -171,23 +169,30 @@ struct RadarPopoverView: View {
         }
       } label: {
         HStack(spacing: 5) {
-          Text(showingDetails ? "收起依据" : "详细依据")
+          Text(showingDetails ? "返回预测" : "详细依据")
             .contentTransition(.opacity)
-          Image(systemName: "chevron.down")
+          Image(systemName: showingDetails ? "chevron.left" : "chevron.down")
             .font(.system(size: 8, weight: .semibold))
-            .rotationEffect(showingDetails ? .degrees(180) : .zero)
         }
         .font(.system(size: 10, weight: .medium))
         .frame(height: 30)
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
-      .accessibilityLabel(showingDetails ? "收起详细依据" : "查看详细依据")
+      .accessibilityLabel(showingDetails ? "返回预测" : "查看详细依据")
     }
     .padding(.horizontal, 16)
     .frame(height: 44)
     .background(Color.primary.opacity(0.035))
     .overlay(alignment: .top) { Divider() }
+  }
+
+  private func evidencePage(_ snapshot: PredictionSnapshot) -> some View {
+    VStack(spacing: 0) {
+      detailedEvidence(snapshot)
+      Spacer(minLength: 0)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   private func detailedEvidence(_ snapshot: PredictionSnapshot) -> some View {
@@ -305,19 +310,7 @@ struct RadarPopoverView: View {
     return .secondary
   }
 
-  private var panelHeight: CGFloat {
-    Self.preferredHeight(
-      showingSettings: showingSettings,
-      showingDetails: showingDetails
-    )
-  }
-
-  static func preferredHeight(
-    showingSettings: Bool,
-    showingDetails: Bool
-  ) -> CGFloat {
-    showingSettings || !showingDetails ? 350 : 575
-  }
+  static let panelHeight: CGFloat = 350
 
   private func evidenceColor(_ category: String) -> Color {
     switch category {
