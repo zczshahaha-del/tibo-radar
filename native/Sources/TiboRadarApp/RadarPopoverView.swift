@@ -221,8 +221,16 @@ struct RadarPopoverView: View {
         .padding(.top, 5)
 
       VStack(alignment: .leading, spacing: 3) {
-        Text(item.label)
-          .font(.system(size: 11, weight: .semibold))
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Text(item.label)
+            .font(.system(size: 11, weight: .semibold))
+
+          if let sourceDate = item.sourceDate {
+            Text(evidenceDateLabel(sourceDate))
+              .font(.system(size: 9, weight: .medium))
+              .foregroundStyle(.tertiary)
+          }
+        }
         Text(item.detail)
           .font(.system(size: 10))
           .foregroundStyle(.secondary)
@@ -246,6 +254,17 @@ struct RadarPopoverView: View {
       }
     }
     .padding(.vertical, 6)
+  }
+
+  private func evidenceDateLabel(_ date: Date) -> String {
+    let dateText = date.formatted(
+      Date.FormatStyle()
+        .month(.defaultDigits)
+        .day(.defaultDigits)
+        .locale(Locale(identifier: "zh_CN"))
+    )
+    guard Date().timeIntervalSince(date) > 72 * 60 * 60 else { return dateText }
+    return "历史 · \(dateText)"
   }
 
   private var loading: some View {

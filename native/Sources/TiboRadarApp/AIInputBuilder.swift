@@ -35,6 +35,12 @@ enum AIInputBuilder {
       context["historical_events"] = trimmedArray(timeline["events"], limit: 40)
     }
     if let feed = bundle.payloads[.feed]?.objectValue {
+      context["tibo_feed_freshness"] = jsonObject(
+        selecting: [
+          "fetched_at", "newest_post_at", "signal_newest_post_at", "content_age_days", "stale",
+        ],
+        from: feed
+      )
       context["recent_tibo_feed"] = trimmedObjects(
         feed["events"],
         limit: 40,
@@ -44,6 +50,13 @@ enum AIInputBuilder {
         ]
       )
       context["recent_tibo_posts"] = recentTiboPosts(feed["tweets"], limit: 12)
+      context["recent_tibo_context"] = trimmedObjects(
+        feed["radar_context"],
+        limit: 12,
+        selecting: [
+          "id", "at", "text", "url", "display_kind", "visibility_only",
+        ]
+      )
     }
     if let status = bundle.payloads[.status]?.objectValue {
       context["aggregated_status_incidents"] = trimmedArray(status["incidents"], limit: 15)

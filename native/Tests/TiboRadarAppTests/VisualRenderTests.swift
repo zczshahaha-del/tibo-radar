@@ -127,8 +127,9 @@ final class VisualRenderTests: XCTestCase {
   }
 
   private func previewSnapshot() -> PredictionSnapshot {
-    PredictionSnapshot(
-      generatedAt: Date(),
+    let now = Date()
+    return PredictionSnapshot(
+      generatedAt: now,
       global24h: ForecastProbabilityRange(lower: 8, likely: 15, upper: 25),
       global48h: ForecastProbabilityRange(lower: 15, likely: 28, upper: 42),
       banked24h: ForecastProbabilityRange(lower: 4, likely: 8, upper: 14),
@@ -151,7 +152,7 @@ final class VisualRenderTests: XCTestCase {
       ),
       baselineNote: "历史基准（307 次回放）：24 小时 12–37%，48 小时 25–55%。",
       lastResetAt: nil,
-      dataUpdatedAt: Date(),
+      dataUpdatedAt: now,
       isStale: false,
       evidence: [
         Evidence(
@@ -159,20 +160,23 @@ final class VisualRenderTests: XCTestCase {
           label: "上一轮重置刚完成",
           detail: "Tibo 约 7 小时前确认重置已经传播完毕，短时间内再次重置的可能性下降。",
           category: "negative",
-          sourceURL: URL(string: "https://x.com/tibo_maker")
+          sourceURL: URL(string: "https://x.com/tibo_maker"),
+          sourceDate: now.addingTimeInterval(-7 * 60 * 60)
         ),
         Evidence(
           id: "preview-counter",
           label: "没有新的未来预告",
           detail: "近期 Tibo 原文没有再次承诺重置额度，也没有面向所有用户的重置卡消息。",
           category: "negative",
-          sourceURL: URL(string: "https://x.com/tibo_maker")
+          sourceURL: URL(string: "https://x.com/tibo_maker"),
+          sourceDate: now.addingTimeInterval(-2 * 24 * 60 * 60)
         ),
         Evidence(
           id: "preview-history",
           label: "48 小时仍保留历史机会",
           detail: "预测窗口变长后，历史上自然发生重置或发卡的累计概率会升高。",
-          category: "context"
+          category: "context",
+          sourceDate: now.addingTimeInterval(-6 * 24 * 60 * 60)
         ),
       ],
       latestEvents: [],

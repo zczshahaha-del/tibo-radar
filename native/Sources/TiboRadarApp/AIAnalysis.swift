@@ -86,14 +86,33 @@ struct AIAnalysis: Codable, Equatable, Sendable {
     let metadata = SourceMetadata(bundle: bundle)
     let stale = !bundle.cacheFallbacks.isEmpty || metadata.isOlderThanFourHours(now: now)
     let calibration = ProbabilityCalibration.evaluate(bundle: bundle)
-    var mappedEvidence = evidence.prefix(6).map { item in
-      Evidence(
-        label: item.label,
-        detail: item.detail,
-        category: Self.normalizedCategory(item.category),
-        sourceURL: item.sourceURL.flatMap(URL.init(string:))
+    let sourceIndex = EvidenceSourceIndex(bundle: bundle)
+    var mappedEvidence = evidence.prefix(6).enumerated().map { index, item in
+      let sourceURL = item.sourceURL.flatMap(URL.init(string:))
+      return (
+        originalIndex: index,
+        evidence: Evidence(
+          label: item.label,
+          detail: item.detail,
+          category: Self.normalizedCategory(item.category),
+          sourceURL: sourceURL,
+          sourceDate: sourceIndex.date(for: sourceURL)
+        )
       )
     }
+    .sorted { left, right in
+      switch (left.evidence.sourceDate, right.evidence.sourceDate) {
+      case let (leftDate?, rightDate?) where leftDate != rightDate:
+        return leftDate > rightDate
+      case (_?, nil):
+        return true
+      case (nil, _?):
+        return false
+      default:
+        return left.originalIndex < right.originalIndex
+      }
+    }
+    .map(\.evidence)
     if mappedEvidence.isEmpty {
       mappedEvidence = [
         Evidence(label: "AI 综合判断", detail: summary, category: "context")
@@ -190,6 +209,69 @@ struct AIAnalysis: Codable, Equatable, Sendable {
     return freshness
       + "历史基准（\(estimate.sampleSize) 次回放）：24 小时 \(estimate.label24h)，"
       + "48 小时 \(estimate.label48h)。"
+  }
+}
+
+private struct EvidenceSourceIndex {
+  private var datesByURL: [String: Date] = [:]
+  private var datesByID: [String: Date] = [:]
+
+  init(bundle: SourceBundle) {
+    for payload in bundle.payloads.values {
+      index(payload)
+    }
+  }
+
+  func date(for sourceURL: URL?) -> Date? {
+    guard let sourceURL else { return nil }
+    if let exact = datesByURL[Self.normalized(sourceURL.absoluteString)] {
+      return exact
+    }
+    return datesByID[sourceURL.lastPathComponent]
+  }
+
+  private mutating func index(_ value: JSONValue) {
+    switch value {
+    case .object(let object):
+      index(object)
+      for child in object.values {
+        index(child)
+      }
+    case .array(let values):
+      for child in values {
+        index(child)
+      }
+    case .string, .number, .bool, .null:
+      break
+    }
+  }
+
+  private mutating func index(_ object: [String: JSONValue]) {
+    let sourceDate = [
+      "at", "declared_at", "announced_at", "observed_at", "effective_at",
+      "started_at", "created_at", "date",
+    ]
+    .compactMap { SourceMetadata.parseDate(object.string($0)) }
+    .first
+    guard let sourceDate else { return }
+
+    for key in ["url", "source_url", "shortlink"] {
+      guard let rawURL = object.string(key), !rawURL.isEmpty else { continue }
+      Self.register(sourceDate, in: &datesByURL, key: Self.normalized(rawURL))
+    }
+    if let id = object.string("id"), !id.isEmpty {
+      Self.register(sourceDate, in: &datesByID, key: id)
+    }
+  }
+
+  private static func register(_ date: Date, in index: inout [String: Date], key: String) {
+    guard !key.isEmpty else { return }
+    if let existing = index[key], existing >= date { return }
+    index[key] = date
+  }
+
+  private static func normalized(_ rawURL: String) -> String {
+    rawURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
   }
 }
 

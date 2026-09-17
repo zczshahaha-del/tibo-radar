@@ -176,6 +176,8 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
 
       recent_tibo_posts.text 是近期 Tibo 原帖正文，closing_paragraph 是为防止长帖遗漏而单独保留的最后一段；recent_tibo_feed 中的 summary 可能只截取开头。判断时必须阅读全文和 closing_paragraph，尤其检查末尾是否有重置承诺、目标人群和截止时间；摘要与正文不完整或冲突时，以 recent_tibo_posts.text 为准。输入里不会提供上游关键词分类结论，你必须自己根据原文判断。遇到 today、tonight、midnight、end of day 等相对时间，必须结合帖子发布时间判断；无法确定作者时区时扩大时间不确定性，但不能在没有后续落地证据或截止时间已经过去的情况下把明确的未来承诺说成“已经发生”。英文 “is landing by ...” 表示尚在到达过程并承诺最晚时间，不等于已经完成的 “landed”。
 
+      recent_tibo_context 是 Tibo 最新的普通公开动态，用来确认作者近期是否仍在活跃，以及活跃期间是否没有新的重置预告。普通动态本身不得被当作重置的正面信号。tibo_feed_freshness 用来判断数据是否真正更新；不要把某条旧的重置相关言论误写成“最新消息”。
+
       官方原帖若明确承诺在未来 24/48 小时内向广泛用户发放重置或重置卡，这条直接证据应优先于历史间隔。刚发生过重置可以作为反面证据，但不能把尚未到期的明确承诺压回普通历史基准。仍要区分全局福利、普发重置卡和仅限受影响用户的定向补偿。
 
       你必须每次都预测，不能用“没有新信号”代替概率，也不能因为没有新信号就返回全零。没有新信号时，概率应保留在合理的历史基准附近；明确预告、强暗示或反面证据可以改变范围，但必须在 analysis_note 里直说原因。
@@ -183,6 +185,8 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
       每个概率使用 lower、likely、upper 三个整数表达范围。全局重置、普发重置卡和两者至少发生一种的 24/48 小时范围都必须为 1–99，且 lower ≤ likely ≤ upper。48 小时累计概率不能低于对应的 24 小时概率；combined 必须不低于 global 和 banked。定向故障补发只针对受影响用户，不得混入 combined；没有对应人群时返回 null。
 
       已经发生的重置只能作为历史，不得冒充未来事件。文字说明中不要重复百分比，数字只放在结构化范围字段里。
+
+      evidence 数组必须按原始来源时间从新到旧排列；较旧的历史背景放在较新证据之后。能找到原始来源时必须填写 source_url。
 
       输出只能是一个 JSON 对象，不能带 Markdown 或额外说明：
       {

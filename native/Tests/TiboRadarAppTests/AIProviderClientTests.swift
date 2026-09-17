@@ -68,6 +68,8 @@ final class AIProviderClientTests: XCTestCase {
     XCTAssertTrue(requestText.contains("你必须每次都预测"))
     XCTAssertTrue(requestText.contains("没有新信号时，概率应保留在合理的历史基准附近"))
     XCTAssertTrue(requestText.contains("以 recent_tibo_posts.text 为准"))
+    XCTAssertTrue(requestText.contains("recent_tibo_context 是 Tibo 最新的普通公开动态"))
+    XCTAssertTrue(requestText.contains("evidence 数组必须按原始来源时间从新到旧排列"))
     XCTAssertTrue(requestText.contains("不能把尚未到期的明确承诺压回普通历史基准"))
     XCTAssertTrue(requestText.contains("不等于已经完成的 “landed”"))
   }
