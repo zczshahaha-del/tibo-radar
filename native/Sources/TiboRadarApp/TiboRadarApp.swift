@@ -49,9 +49,9 @@ final class TiboRadarAppDelegate: NSObject, NSApplicationDelegate {
     guard let button = statusItem?.button else { return }
     let popover = popoverController.popover
     if popover.isShown {
-      popover.performClose(sender)
+      popoverController.close(sender)
     } else {
-      popover.show(
+      popoverController.show(
         relativeTo: button.bounds,
         of: button,
         preferredEdge: .minY
@@ -66,13 +66,16 @@ final class TiboRadarAppDelegate: NSObject, NSApplicationDelegate {
 }
 
 @MainActor
-final class RadarPopoverController {
+final class RadarPopoverController: NSObject, NSPopoverDelegate {
   let popover: NSPopover
+  private var outsideClickMonitor: Any?
 
   init(popover: NSPopover = NSPopover()) {
     self.popover = popover
+    super.init()
     popover.behavior = .transient
     popover.animates = false
+    popover.delegate = self
   }
 
   func install(_ contentViewController: NSViewController) {
@@ -83,5 +86,44 @@ final class RadarPopoverController {
     let size = NSSize(width: RadarPopoverView.panelWidth, height: height)
     popover.contentSize = size
     popover.contentViewController?.preferredContentSize = size
+  }
+
+  func show(
+    relativeTo positioningRect: NSRect,
+    of positioningView: NSView,
+    preferredEdge: NSRectEdge
+  ) {
+    popover.show(
+      relativeTo: positioningRect,
+      of: positioningView,
+      preferredEdge: preferredEdge
+    )
+    startOutsideClickMonitoring()
+  }
+
+  func close(_ sender: Any? = nil) {
+    stopOutsideClickMonitoring()
+    popover.performClose(sender)
+  }
+
+  func popoverDidClose(_ notification: Notification) {
+    stopOutsideClickMonitoring()
+  }
+
+  private func startOutsideClickMonitoring() {
+    guard outsideClickMonitor == nil else { return }
+    outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
+      matching: [.leftMouseDown, .rightMouseDown]
+    ) { [weak self] _ in
+      Task { @MainActor in
+        self?.close()
+      }
+    }
+  }
+
+  private func stopOutsideClickMonitoring() {
+    guard let outsideClickMonitor else { return }
+    NSEvent.removeMonitor(outsideClickMonitor)
+    self.outsideClickMonitor = nil
   }
 }
