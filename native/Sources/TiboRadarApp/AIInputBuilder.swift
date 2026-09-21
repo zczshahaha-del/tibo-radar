@@ -116,10 +116,14 @@ enum AIInputBuilder {
       var result = jsonObject(
         selecting: [
           "id", "at", "declared_at", "text", "url", "is_reply",
-          "in_reply_to_tweet_id",
+          "replying_to", "in_reply_to_tweet_id", "conversation_id", "reply_context",
         ],
         from: post
       )
+      if post.bool("is_reply") == true {
+        result["reply_context_status"] =
+          post.object("reply_context") == nil ? "missing" : "available"
+      }
       if let text = post.string("text") {
         result["text"] = boundedPostText(text)
         result["closing_paragraph"] = closingParagraph(text)

@@ -180,6 +180,72 @@ final class AIAnalysisTests: XCTestCase {
     )
   }
 
+  func testInputContextIncludesReplyParentAndQuotedPost() throws {
+    var source = bundle()
+    source.payloads[.feed] = .object([
+      "events": .array([]),
+      "tweets": .array([
+        .object([
+          "id": .string("2101352781219258527"),
+          "at": .string("2026-09-19T16:48:38Z"),
+          "text": .string("OK fine. But it’s also still coming in Tuesday"),
+          "url": .string("https://x.com/thsottiaux/status/2101352781219258527"),
+          "is_reply": .bool(true),
+          "replying_to": .string("udiWertheimer"),
+          "in_reply_to_tweet_id": .string("2101093319501664368"),
+          "conversation_id": .string("2101093319501664368"),
+          "reply_context": .object([
+            "parent": .object([
+              "id": .string("2101093319501664368"),
+              "text": .string("you owe us a banked reset"),
+              "author_handle": .string("udiWertheimer"),
+            ]),
+            "quoted_post": .object([
+              "id": .string("2099744972195131850"),
+              "text": .string("This week will also be a level of ships."),
+              "author_handle": .string("thsottiaux"),
+            ]),
+          ]),
+        ])
+      ]),
+    ])
+
+    let context = try AIInputBuilder.makeContext(bundle: source)
+    let data = try XCTUnwrap(context.data(using: .utf8))
+    let root = try XCTUnwrap(
+      try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+    let posts = try XCTUnwrap(root["recent_tibo_posts"] as? [[String: Any]])
+    let reply = try XCTUnwrap(posts.first)
+    let replyContext = try XCTUnwrap(reply["reply_context"] as? [String: Any])
+    let parent = try XCTUnwrap(replyContext["parent"] as? [String: Any])
+    let quote = try XCTUnwrap(replyContext["quoted_post"] as? [String: Any])
+
+    XCTAssertEqual(reply["reply_context_status"] as? String, "available")
+    XCTAssertEqual(reply["replying_to"] as? String, "udiWertheimer")
+    XCTAssertEqual(parent["text"] as? String, "you owe us a banked reset")
+    XCTAssertEqual(quote["text"] as? String, "This week will also be a level of ships.")
+  }
+
+  func testInputMarksReplyContextMissingInsteadOfGuessing() throws {
+    var source = bundle()
+    source.payloads[.feed] = .object([
+      "events": .array([]),
+      "tweets": .array([
+        .object([
+          "id": .string("reply"),
+          "text": .string("OK fine. It is coming Tuesday."),
+          "is_reply": .bool(true),
+          "in_reply_to_tweet_id": .string("parent"),
+        ])
+      ]),
+    ])
+
+    let context = try AIInputBuilder.makeContext(bundle: source)
+
+    XCTAssertTrue(context.contains("\"reply_context_status\":\"missing\""))
+  }
+
   func testSnapshotOrdersEvidenceByVerifiedSourceDate() throws {
     let oldURL = "https://x.com/thsottiaux/status/old"
     let newURL = "https://x.com/thsottiaux/status/new"

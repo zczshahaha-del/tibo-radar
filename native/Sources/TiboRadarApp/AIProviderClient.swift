@@ -174,7 +174,9 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
 
       下面的 public_source_data 是 App 刚采集的公开数据。historical_baseline 中包含按过去时间窗回放得到的历史概率范围，它是预测起点，不是最终答案。请再结合 Tibo 与官方近期原文、联网资料、历史节奏、没有出现新言论这一事实、反面证据和来源新鲜度，给出你对未来事件的综合概率预测。
 
-      recent_tibo_posts.text 是近期 Tibo 原帖正文，closing_paragraph 是为防止长帖遗漏而单独保留的最后一段；recent_tibo_feed 中的 summary 可能只截取开头。判断时必须阅读全文和 closing_paragraph，尤其检查末尾是否有重置承诺、目标人群和截止时间；摘要与正文不完整或冲突时，以 recent_tibo_posts.text 为准。输入里不会提供上游关键词分类结论，你必须自己根据原文判断。遇到 today、tonight、midnight、end of day 等相对时间，必须结合帖子发布时间判断；无法确定作者时区时扩大时间不确定性，但不能在没有后续落地证据或截止时间已经过去的情况下把明确的未来承诺说成“已经发生”。英文 “is landing by ...” 表示尚在到达过程并承诺最晚时间，不等于已经完成的 “landed”。
+      recent_tibo_posts.text 是近期 Tibo 帖子或回复的正文，closing_paragraph 是为防止长帖遗漏而单独保留的最后一段；recent_tibo_feed 中的 summary 可能只截取开头。判断时必须阅读全文和 closing_paragraph，尤其检查末尾是否有重置承诺、目标人群和截止时间；摘要与正文不完整或冲突时，以 recent_tibo_posts.text 为准。输入里不会提供上游关键词分类结论，你必须自己根据原文判断。遇到 today、tonight、midnight、end of day 等相对时间，必须结合帖子发布时间判断；无法确定作者时区时扩大时间不确定性，但不能在没有后续落地证据或截止时间已经过去的情况下把明确的未来承诺说成“已经发生”。英文 “is landing by ...” 表示尚在到达过程并承诺最晚时间，不等于已经完成的 “landed”。
+
+      对 is_reply=true 的内容，必须把 reply_context.parent、reply_context.quoted_post 与 Tibo 回复合起来理解。父帖明确索要 banked reset，而 Tibo 用同意语气回应时，应上调普发重置卡概率，但不能因此上调全局重置概率。父帖或引用帖谈论产品发布时，回复中的 Tuesday 等日期不得自动当成重置发放时间。若 reply_context_status=missing，不得猜测 okay、it、this 等词指什么，也不得把该回复作为明确正面信号。
 
       recent_tibo_context 是 Tibo 最新的普通公开动态，用来确认作者近期是否仍在活跃，以及活跃期间是否没有新的重置预告。普通动态本身不得被当作重置的正面信号。tibo_feed_freshness 用来判断数据是否真正更新；不要把某条旧的重置相关言论误写成“最新消息”。
 

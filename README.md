@@ -73,6 +73,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 ## 数据来源
 
 - `codex-reset.com` 提供的公开历史、timeline、Tibo feed 和历史概率范围；
+- `api.fxtwitter.com` 按公开帖子 ID 尽力补充 Tibo 回复的父帖和引用帖正文；
 - OpenAI Status 的公开状态数据；
 - 原始 Tibo 帖子的公开链接，用于展示证据。
 - 选择千问时，由阿里云百炼提供的联网搜索补充近期网络讨论。

@@ -16,6 +16,10 @@ final class LiveAIProviderTests: XCTestCase {
       .appendingPathComponent("TiboRadarLiveAITest-\(UUID().uuidString)")
     let bundle = await RadarClient(cacheDirectory: cache).fetchAll()
     let context = try AIInputBuilder.makeContext(bundle: bundle)
+    if context.contains("2101352781219258527") {
+      XCTAssertTrue(context.contains("you owe us a banked reset"))
+      XCTAssertTrue(context.contains("level of ships"))
+    }
     let analysis = try await AIProviderClient().analyze(
       context: context,
       configuration: AIConfiguration(provider: .deepSeek, model: "deepseek-flash"),
@@ -32,5 +36,9 @@ final class LiveAIProviderTests: XCTestCase {
     XCTAssertNotNil(snapshot.historicalBaseline)
     XCTAssertFalse(snapshot.analysisNote.contains("%"))
     XCTAssertFalse(snapshot.summary.contains("%"))
+    print(
+      "Live DeepSeek banked 24h: \(snapshot.banked24h.label); "
+        + "evidence: \(snapshot.evidence.map(\.label).joined(separator: " | "))"
+    )
   }
 }

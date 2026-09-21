@@ -29,7 +29,9 @@ AI 综合历史与近期证据 ──→ 全局 / 普发卡 / 综合 24/48 小�
 
 原生 App 位于 `native/`：
 
-- `RadarClient.swift`：并行获取公开 JSON，并写入 App 专用缓存目录。
+- `RadarClient.swift`：并行获取公开 JSON、补全回复上下文，并写入 App 专用缓存目录。
+- `ReplyContextClient.swift`：按公开帖子 ID 尽力获取父帖和引用帖正文；失败时不影响
+  主 feed，并允许沿用已有缓存。
 - `AIProviderClient.swift`：调用 DeepSeek 或千问，并把结果解析为统一结构。
 - `AIInputBuilder.swift`：筛选公开原文，并把历史回放概率作为 AI 预测基准。
 - `AIAnalysis.swift`：校验 AI 概率范围、证据和时间关系并生成 App 快照。
@@ -39,7 +41,8 @@ AI 综合历史与近期证据 ──→ 全局 / 普发卡 / 综合 24/48 小�
 - `AIRefreshGate.swift`：资料变化时调用 AI；资料不变时限制后台调用频率。
 - `RadarViewModel.swift`：管理首次加载、手动刷新、2 小时自动刷新和状态。
 - `NotificationManager.swift`：负责系统授权、AI 概率阈值和事件去重。
-- `TiboRadarApp.swift`：创建 `NSStatusItem` 和 `NSPopover`，并明确控制弹窗尺寸。
+- `TiboRadarApp.swift`：以纯 AppKit accessory 应用创建 `NSStatusItem` 和
+  `NSPopover`，不声明独立设置窗口，并明确控制弹窗尺寸。
 - `RadarPopoverView.swift`：实现菜单栏弹出面板并请求收起、展开所需高度。
 - `build-app.sh`：构建 Release 二进制并组装、临时签名 `.app`。
 
@@ -58,6 +61,9 @@ AI 必须输出固定结构：每个预测的低值、最可能值和高值，�
 DeepSeek 官方直连接口用于分析 App 采集的实时公开原文；千问除处理同一批
 原文外，还通过百炼的 `enable_search` 补充联网搜索。两家接口地址固定为官方
 主机，模型名称可修改，Key 分开保存在钥匙串。
+
+Tibo 回复的父帖和引用帖由 `api.fxtwitter.com` 按公开帖子 ID 尽力补全，不传账号、
+Cookie 或私有数据。补全失败时 AI 会收到上下文缺失标记，不能猜测代词或日期指向。
 
 历史基准必须来自按时间顺序隐藏未来数据的回放；至少 100 个时间窗、范围
 合法且击败简单猜测后才会交给 AI。AI 结合该基准与当前证据给出最终范围，

@@ -10,9 +10,15 @@ private struct FetchResult: Sendable {
 final class RadarClient: @unchecked Sendable {
   private let session: URLSession
   private let cacheDirectory: URL
+  private let replyContextClient: any ReplyContextFetching
 
-  init(session: URLSession = .shared, cacheDirectory: URL? = nil) {
+  init(
+    session: URLSession = .shared,
+    cacheDirectory: URL? = nil,
+    replyContextClient: (any ReplyContextFetching)? = nil
+  ) {
     self.session = session
+    self.replyContextClient = replyContextClient ?? PublicReplyContextClient(session: session)
     if let cacheDirectory {
       self.cacheDirectory = cacheDirectory
     } else {
@@ -53,6 +59,18 @@ final class RadarClient: @unchecked Sendable {
           errors.append(error)
         }
       }
+
+      if let feed = payloads[.feed], !cacheFallbacks.contains(.feed) {
+        let enrichedFeed = await enrichReplyContexts(
+          in: feed,
+          cachedFeed: readCache(for: .feed)
+        )
+        payloads[.feed] = enrichedFeed
+        try? JSONEncoder().encode(enrichedFeed).write(
+          to: cacheURL(for: .feed),
+          options: .atomic
+        )
+      }
       return SourceBundle(
         payloads: payloads,
         cacheFallbacks: cacheFallbacks,
@@ -81,7 +99,9 @@ final class RadarClient: @unchecked Sendable {
       guard payload.objectValue != nil else {
         throw URLError(.cannotParseResponse)
       }
-      try? JSONEncoder().encode(payload).write(to: cacheURL(for: source), options: .atomic)
+      if source != .feed {
+        try? JSONEncoder().encode(payload).write(to: cacheURL(for: source), options: .atomic)
+      }
       return FetchResult(source: source, payload: payload, usedCache: false, error: nil)
     } catch {
       if let cached = readCache(for: source) {
@@ -108,5 +128,64 @@ final class RadarClient: @unchecked Sendable {
   private func readCache(for source: RadarSource) -> JSONValue? {
     guard let data = try? Data(contentsOf: cacheURL(for: source)) else { return nil }
     return try? JSONDecoder().decode(JSONValue.self, from: data)
+  }
+
+  func enrichReplyContexts(
+    in feed: JSONValue,
+    cachedFeed: JSONValue? = nil
+  ) async -> JSONValue {
+    guard var feedObject = feed.objectValue,
+      let tweets = feedObject.array("tweets")
+    else { return feed }
+
+    let parentIDs = tweets.prefix(12).compactMap { value -> String? in
+      guard let tweet = value.objectValue,
+        tweet.bool("is_reply") == true
+      else { return nil }
+      return tweet.string("in_reply_to_tweet_id")
+    }
+    let uniqueParentIDs = Array(Set(parentIDs)).sorted()
+    guard !uniqueParentIDs.isEmpty else { return feed }
+
+    let cachedContexts = Self.cachedReplyContexts(from: cachedFeed)
+    let parentIDSet = Set(uniqueParentIDs)
+    var fetchedContexts = cachedContexts.filter { parentIDSet.contains($0.key) }
+    let missingParentIDs = uniqueParentIDs.filter { cachedContexts[$0] == nil }
+    let client = replyContextClient
+    await withTaskGroup(of: (String, JSONValue?).self) { group in
+      for parentID in missingParentIDs {
+        group.addTask {
+          (parentID, await client.fetchContext(parentTweetID: parentID))
+        }
+      }
+      for await (parentID, context) in group {
+        if let context {
+          fetchedContexts[parentID] = context
+        }
+      }
+    }
+
+    feedObject["tweets"] = .array(tweets.map { value in
+      guard var tweet = value.objectValue,
+        let parentID = tweet.string("in_reply_to_tweet_id"),
+        let context = fetchedContexts[parentID]
+      else { return value }
+      tweet["reply_context"] = context
+      return .object(tweet)
+    })
+    return .object(feedObject)
+  }
+
+  private static func cachedReplyContexts(from feed: JSONValue?) -> [String: JSONValue] {
+    guard let tweets = feed?.objectValue?.array("tweets") else { return [:] }
+    var contexts: [String: JSONValue] = [:]
+    for value in tweets {
+      guard let tweet = value.objectValue,
+        let parentID = tweet.string("in_reply_to_tweet_id"),
+        let context = tweet["reply_context"]
+      else { continue }
+      contexts[parentID] = context
+    }
+    return contexts
   }
 }

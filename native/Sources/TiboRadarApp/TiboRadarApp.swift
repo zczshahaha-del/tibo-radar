@@ -2,12 +2,17 @@ import AppKit
 import SwiftUI
 
 @main
-struct TiboRadarApp: App {
-  @NSApplicationDelegateAdaptor(TiboRadarAppDelegate.self) private var appDelegate
+enum TiboRadarApplication {
+  static let activationPolicy: NSApplication.ActivationPolicy = .accessory
 
-  var body: some Scene {
-    Settings {
-      EmptyView()
+  @MainActor
+  static func main() {
+    let application = NSApplication.shared
+    let delegate = TiboRadarAppDelegate()
+    application.setActivationPolicy(activationPolicy)
+    application.delegate = delegate
+    withExtendedLifetime(delegate) {
+      application.run()
     }
   }
 }
@@ -41,7 +46,7 @@ final class TiboRadarAppDelegate: NSObject, NSApplicationDelegate {
     .environmentObject(model)
     let hostingController = NSHostingController(rootView: rootView)
 
-    popoverController.install(hostingController)
+    popoverController.installHostingController(hostingController)
     popoverController.resize(to: RadarPopoverView.compactHeight)
   }
 
@@ -82,10 +87,16 @@ final class RadarPopoverController: NSObject, NSPopoverDelegate {
     popover.contentViewController = contentViewController
   }
 
+  func installHostingController<Content: View>(
+    _ contentViewController: NSHostingController<Content>
+  ) {
+    contentViewController.sizingOptions = []
+    install(contentViewController)
+  }
+
   func resize(to height: CGFloat) {
     let size = NSSize(width: RadarPopoverView.panelWidth, height: height)
     popover.contentSize = size
-    popover.contentViewController?.preferredContentSize = size
   }
 
   func show(

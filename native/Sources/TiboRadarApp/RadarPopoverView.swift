@@ -4,15 +4,18 @@ struct RadarPopoverView: View {
   @EnvironmentObject private var model: RadarViewModel
   @State private var showingSettings = false
   @State private var showingDetails = false
+  @State private var measuredExpandedHeight = Self.fallbackExpandedHeight
   private let onPreferredHeightChange: (CGFloat) -> Void
 
   init(
     initiallyShowingDetails: Bool = false,
     initiallyShowingSettings: Bool = false,
+    initiallyMeasuredExpandedHeight: CGFloat = Self.fallbackExpandedHeight,
     onPreferredHeightChange: @escaping (CGFloat) -> Void = { _ in }
   ) {
     _showingDetails = State(initialValue: initiallyShowingDetails)
     _showingSettings = State(initialValue: initiallyShowingSettings)
+    _measuredExpandedHeight = State(initialValue: initiallyMeasuredExpandedHeight)
     self.onPreferredHeightChange = onPreferredHeightChange
   }
 
@@ -39,6 +42,14 @@ struct RadarPopoverView: View {
     .frame(width: Self.panelWidth)
     .frame(height: panelHeight, alignment: .top)
     .background(.ultraThinMaterial)
+    .background {
+      if let snapshot = model.snapshot {
+        expandedHeightProbe(snapshot)
+      }
+    }
+    .onPreferenceChange(ExpandedContentHeightKey.self) { height in
+      updateMeasuredExpandedHeight(height)
+    }
   }
 
   private var header: some View {
@@ -212,6 +223,28 @@ struct RadarPopoverView: View {
     .overlay(alignment: .top) { Divider() }
   }
 
+  private func expandedHeightProbe(_ snapshot: PredictionSnapshot) -> some View {
+    VStack(spacing: 0) {
+      header
+      forecast(snapshot)
+      footer
+      detailedEvidence(snapshot)
+    }
+    .frame(width: Self.panelWidth)
+    .fixedSize(horizontal: false, vertical: true)
+    .background {
+      GeometryReader { geometry in
+        Color.clear.preference(
+          key: ExpandedContentHeightKey.self,
+          value: geometry.size.height
+        )
+      }
+    }
+    .hidden()
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
+  }
+
   private func evidenceRow(_ item: Evidence) -> some View {
     HStack(alignment: .top, spacing: 9) {
       Circle()
@@ -308,8 +341,20 @@ struct RadarPopoverView: View {
   private var panelHeight: CGFloat {
     Self.preferredHeight(
       showingSettings: showingSettings,
-      showingDetails: showingDetails
+      showingDetails: showingDetails,
+      expandedHeight: measuredExpandedHeight
     )
+  }
+
+  private func updateMeasuredExpandedHeight(_ height: CGFloat) {
+    guard height.isFinite, height > 0 else { return }
+    let normalizedHeight = max(Self.compactHeight, ceil(height))
+    guard abs(normalizedHeight - measuredExpandedHeight) >= 1 else { return }
+
+    measuredExpandedHeight = normalizedHeight
+    if showingDetails && !showingSettings {
+      onPreferredHeightChange(normalizedHeight)
+    }
   }
 
   private func toggleSettings() {
@@ -318,29 +363,37 @@ struct RadarPopoverView: View {
     onPreferredHeightChange(
       Self.preferredHeight(
         showingSettings: nextValue,
-        showingDetails: showingDetails
+        showingDetails: showingDetails,
+        expandedHeight: measuredExpandedHeight
       )
     )
   }
 
   private func toggleDetails() {
     let nextValue = !showingDetails
-    showingDetails = nextValue
-    onPreferredHeightChange(
-      Self.preferredHeight(
-        showingSettings: showingSettings,
-        showingDetails: nextValue
-      )
+    let nextHeight = Self.preferredHeight(
+      showingSettings: showingSettings,
+      showingDetails: nextValue,
+      expandedHeight: measuredExpandedHeight
     )
+
+    if nextValue {
+      onPreferredHeightChange(nextHeight)
+      showingDetails = true
+    } else {
+      showingDetails = false
+      onPreferredHeightChange(nextHeight)
+    }
   }
 
   static let panelWidth: CGFloat = 344
   static let compactHeight: CGFloat = 350
-  static let expandedHeight: CGFloat = 575
+  static let fallbackExpandedHeight: CGFloat = 640
 
   static func preferredHeight(
     showingSettings: Bool,
-    showingDetails: Bool
+    showingDetails: Bool,
+    expandedHeight: CGFloat = fallbackExpandedHeight
   ) -> CGFloat {
     showingSettings || !showingDetails ? compactHeight : expandedHeight
   }
@@ -352,5 +405,13 @@ struct RadarPopoverView: View {
     case "targeted": .orange
     default: .orange
     }
+  }
+}
+
+private struct ExpandedContentHeightKey: PreferenceKey {
+  static let defaultValue: CGFloat = 0
+
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = max(value, nextValue())
   }
 }
