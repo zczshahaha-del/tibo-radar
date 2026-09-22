@@ -155,8 +155,8 @@ final class AIAnalysisTests: XCTestCase {
       "radar_context": .array([
         .object([
           "id": .string("latest-post"),
-          "at": .string("2026-09-16T23:18:15Z"),
-          "text": .string("Sometimes physics can't be cheated"),
+          "at": .string("2026-09-21T06:26:15Z"),
+          "text": .string("3am on a tuesday"),
           "url": .string("https://x.com/thsottiaux/status/latest-post"),
           "visibility_only": .bool(true),
         ])
@@ -176,7 +176,15 @@ final class AIAnalysisTests: XCTestCase {
     XCTAssertEqual(latestContext.first?["id"] as? String, "latest-post")
     XCTAssertEqual(
       latestContext.first?["text"] as? String,
-      "Sometimes physics can't be cheated"
+      "3am on a tuesday"
+    )
+    XCTAssertEqual(
+      latestContext.first?["published_at_beijing"] as? String,
+      "2026-09-21T14:26:15+08:00"
+    )
+    XCTAssertEqual(
+      latestContext.first?["published_at_pacific"] as? String,
+      "2026-09-20T23:26:15-07:00"
     )
   }
 

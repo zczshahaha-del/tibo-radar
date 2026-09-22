@@ -20,6 +20,10 @@ final class LiveAIProviderTests: XCTestCase {
       XCTAssertTrue(context.contains("you owe us a banked reset"))
       XCTAssertTrue(context.contains("level of ships"))
     }
+    if context.contains("2101920928070562029") {
+      XCTAssertTrue(context.contains("3am on a tuesday"))
+      XCTAssertTrue(context.contains("2026-09-20T23:26:15-07:00"))
+    }
     let analysis = try await AIProviderClient().analyze(
       context: context,
       configuration: AIConfiguration(provider: .deepSeek, model: "deepseek-flash"),
@@ -36,6 +40,13 @@ final class LiveAIProviderTests: XCTestCase {
     XCTAssertNotNil(snapshot.historicalBaseline)
     XCTAssertFalse(snapshot.analysisNote.contains("%"))
     XCTAssertFalse(snapshot.summary.contains("%"))
+    if context.contains("2101920928070562029") {
+      XCTAssertTrue(
+        snapshot.evidence.contains {
+          $0.sourceURL?.absoluteString.contains("2101920928070562029") == true
+        }
+      )
+    }
     print(
       "Live DeepSeek banked 24h: \(snapshot.banked24h.label); "
         + "evidence: \(snapshot.evidence.map(\.label).joined(separator: " | "))"
