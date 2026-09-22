@@ -2,16 +2,21 @@ import SwiftUI
 
 struct RadarPopoverView: View {
   @EnvironmentObject private var model: RadarViewModel
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var showingSettings = false
   @State private var showingDetails = false
+  @State private var measuredExpandedHeight = Self.fallbackExpandedHeight
+  private let onPreferredHeightChange: (CGFloat) -> Void
 
   init(
     initiallyShowingDetails: Bool = false,
-    initiallyShowingSettings: Bool = false
+    initiallyShowingSettings: Bool = false,
+    initiallyMeasuredExpandedHeight: CGFloat = Self.fallbackExpandedHeight,
+    onPreferredHeightChange: @escaping (CGFloat) -> Void = { _ in }
   ) {
     _showingDetails = State(initialValue: initiallyShowingDetails)
     _showingSettings = State(initialValue: initiallyShowingSettings)
+    _measuredExpandedHeight = State(initialValue: initiallyMeasuredExpandedHeight)
+    self.onPreferredHeightChange = onPreferredHeightChange
   }
 
   var body: some View {
@@ -29,15 +34,22 @@ struct RadarPopoverView: View {
         footer
         if showingDetails {
           detailedEvidence(snapshot)
-            .transition(.opacity)
         }
       } else {
         loading
       }
     }
-    .frame(width: 344)
-    .frame(height: compactPanelHeight, alignment: .top)
+    .frame(width: Self.panelWidth)
+    .frame(height: panelHeight, alignment: .top)
     .background(.ultraThinMaterial)
+    .background {
+      if let snapshot = model.snapshot {
+        expandedHeightProbe(snapshot)
+      }
+    }
+    .onPreferenceChange(ExpandedContentHeightKey.self) { height in
+      updateMeasuredExpandedHeight(height)
+    }
   }
 
   private var header: some View {
@@ -63,7 +75,7 @@ struct RadarPopoverView: View {
 
       HStack(spacing: 2) {
         Button {
-          showingSettings.toggle()
+          toggleSettings()
         } label: {
           Image(systemName: showingSettings ? "chevron.left" : "gearshape")
             .font(.system(size: 13, weight: .medium))
@@ -166,9 +178,7 @@ struct RadarPopoverView: View {
       Spacer()
 
       Button {
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-          showingDetails.toggle()
-        }
+        toggleDetails()
       } label: {
         HStack(spacing: 5) {
           Text(showingDetails ? "收起依据" : "详细依据")
@@ -213,6 +223,28 @@ struct RadarPopoverView: View {
     .overlay(alignment: .top) { Divider() }
   }
 
+  private func expandedHeightProbe(_ snapshot: PredictionSnapshot) -> some View {
+    VStack(spacing: 0) {
+      header
+      forecast(snapshot)
+      footer
+      detailedEvidence(snapshot)
+    }
+    .frame(width: Self.panelWidth)
+    .fixedSize(horizontal: false, vertical: true)
+    .background {
+      GeometryReader { geometry in
+        Color.clear.preference(
+          key: ExpandedContentHeightKey.self,
+          value: geometry.size.height
+        )
+      }
+    }
+    .hidden()
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
+  }
+
   private func evidenceRow(_ item: Evidence) -> some View {
     HStack(alignment: .top, spacing: 9) {
       Circle()
@@ -221,8 +253,16 @@ struct RadarPopoverView: View {
         .padding(.top, 5)
 
       VStack(alignment: .leading, spacing: 3) {
-        Text(item.label)
-          .font(.system(size: 11, weight: .semibold))
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Text(item.label)
+            .font(.system(size: 11, weight: .semibold))
+
+          if let sourceDate = item.sourceDate {
+            Text(evidenceDateLabel(sourceDate))
+              .font(.system(size: 9, weight: .medium))
+              .foregroundStyle(.tertiary)
+          }
+        }
         Text(item.detail)
           .font(.system(size: 10))
           .foregroundStyle(.secondary)
@@ -248,6 +288,17 @@ struct RadarPopoverView: View {
     .padding(.vertical, 6)
   }
 
+  private func evidenceDateLabel(_ date: Date) -> String {
+    let dateText = date.formatted(
+      Date.FormatStyle()
+        .month(.defaultDigits)
+        .day(.defaultDigits)
+        .locale(Locale(identifier: "zh_CN"))
+    )
+    guard Date().timeIntervalSince(date) > 72 * 60 * 60 else { return dateText }
+    return "历史 · \(dateText)"
+  }
+
   private var loading: some View {
     VStack(spacing: 14) {
       if model.isRefreshing {
@@ -264,6 +315,7 @@ struct RadarPopoverView: View {
       if !model.hasAPIKey {
         Button("打开 AI 设置") {
           showingSettings = true
+          onPreferredHeightChange(Self.compactHeight)
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.small)
@@ -286,8 +338,64 @@ struct RadarPopoverView: View {
     return .secondary
   }
 
-  private var compactPanelHeight: CGFloat? {
-    showingSettings || !showingDetails ? 350 : nil
+  private var panelHeight: CGFloat {
+    Self.preferredHeight(
+      showingSettings: showingSettings,
+      showingDetails: showingDetails,
+      expandedHeight: measuredExpandedHeight
+    )
+  }
+
+  private func updateMeasuredExpandedHeight(_ height: CGFloat) {
+    guard height.isFinite, height > 0 else { return }
+    let normalizedHeight = max(Self.compactHeight, ceil(height))
+    guard abs(normalizedHeight - measuredExpandedHeight) >= 1 else { return }
+
+    measuredExpandedHeight = normalizedHeight
+    if showingDetails && !showingSettings {
+      onPreferredHeightChange(normalizedHeight)
+    }
+  }
+
+  private func toggleSettings() {
+    let nextValue = !showingSettings
+    showingSettings = nextValue
+    onPreferredHeightChange(
+      Self.preferredHeight(
+        showingSettings: nextValue,
+        showingDetails: showingDetails,
+        expandedHeight: measuredExpandedHeight
+      )
+    )
+  }
+
+  private func toggleDetails() {
+    let nextValue = !showingDetails
+    let nextHeight = Self.preferredHeight(
+      showingSettings: showingSettings,
+      showingDetails: nextValue,
+      expandedHeight: measuredExpandedHeight
+    )
+
+    if nextValue {
+      onPreferredHeightChange(nextHeight)
+      showingDetails = true
+    } else {
+      showingDetails = false
+      onPreferredHeightChange(nextHeight)
+    }
+  }
+
+  static let panelWidth: CGFloat = 344
+  static let compactHeight: CGFloat = 350
+  static let fallbackExpandedHeight: CGFloat = 640
+
+  static func preferredHeight(
+    showingSettings: Bool,
+    showingDetails: Bool,
+    expandedHeight: CGFloat = fallbackExpandedHeight
+  ) -> CGFloat {
+    showingSettings || !showingDetails ? compactHeight : expandedHeight
   }
 
   private func evidenceColor(_ category: String) -> Color {
@@ -297,5 +405,13 @@ struct RadarPopoverView: View {
     case "targeted": .orange
     default: .orange
     }
+  }
+}
+
+private struct ExpandedContentHeightKey: PreferenceKey {
+  static let defaultValue: CGFloat = 0
+
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = max(value, nextValue())
   }
 }

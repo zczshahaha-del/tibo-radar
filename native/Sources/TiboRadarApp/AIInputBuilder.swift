@@ -35,6 +35,12 @@ enum AIInputBuilder {
       context["historical_events"] = trimmedArray(timeline["events"], limit: 40)
     }
     if let feed = bundle.payloads[.feed]?.objectValue {
+      context["tibo_feed_freshness"] = jsonObject(
+        selecting: [
+          "fetched_at", "newest_post_at", "signal_newest_post_at", "content_age_days", "stale",
+        ],
+        from: feed
+      )
       context["recent_tibo_feed"] = trimmedObjects(
         feed["events"],
         limit: 40,
@@ -44,6 +50,10 @@ enum AIInputBuilder {
         ]
       )
       context["recent_tibo_posts"] = recentTiboPosts(feed["tweets"], limit: 12)
+      context["recent_tibo_context"] = recentTiboContext(
+        feed["radar_context"],
+        limit: 12
+      )
     }
     if let status = bundle.payloads[.status]?.objectValue {
       context["aggregated_status_incidents"] = trimmedArray(status["incidents"], limit: 15)
@@ -103,16 +113,58 @@ enum AIInputBuilder {
       var result = jsonObject(
         selecting: [
           "id", "at", "declared_at", "text", "url", "is_reply",
-          "in_reply_to_tweet_id",
+          "replying_to", "in_reply_to_tweet_id", "conversation_id", "reply_context",
         ],
         from: post
       )
+      if post.bool("is_reply") == true {
+        result["reply_context_status"] =
+          post.object("reply_context") == nil ? "missing" : "available"
+      }
       if let text = post.string("text") {
         result["text"] = boundedPostText(text)
         result["closing_paragraph"] = closingParagraph(text)
       }
+      appendLocalTimes(from: post, to: &result)
       return result
     }
+  }
+
+  private static func recentTiboContext(
+    _ value: JSONValue?,
+    limit: Int
+  ) -> [[String: Any]] {
+    guard let values = value?.arrayValue else { return [] }
+    return values.prefix(limit).compactMap { value in
+      guard let post = value.objectValue else { return nil }
+      var result = jsonObject(
+        selecting: [
+          "id", "at", "text", "url", "display_kind", "visibility_only",
+        ],
+        from: post
+      )
+      appendLocalTimes(from: post, to: &result)
+      return result
+    }
+  }
+
+  private static func appendLocalTimes(
+    from post: [String: JSONValue],
+    to result: inout [String: Any]
+  ) {
+    guard let rawDate = post.string("at"),
+      let date = ISO8601DateFormatter().date(from: rawDate)
+    else { return }
+    result["published_at_beijing"] = formatted(date, timeZone: "Asia/Shanghai")
+    result["published_at_pacific"] = formatted(date, timeZone: "America/Los_Angeles")
+  }
+
+  private static func formatted(_ date: Date, timeZone identifier: String) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(identifier: identifier)
+    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssXXX"
+    return formatter.string(from: date)
   }
 
   private static func closingParagraph(_ text: String) -> String {

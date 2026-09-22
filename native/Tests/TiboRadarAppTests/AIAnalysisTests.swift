@@ -143,7 +143,192 @@ final class AIAnalysisTests: XCTestCase {
     XCTAssertNil(feed.first?["announcement_state"])
   }
 
-  private func makeAnalysis() -> AIAnalysis {
+  func testInputContextIncludesLatestGeneralTiboActivityAndFreshness() throws {
+    var source = bundle()
+    source.payloads[.feed] = .object([
+      "fetched_at": .string("2026-09-17T01:19:58Z"),
+      "newest_post_at": .string("2026-09-16T23:18:15Z"),
+      "signal_newest_post_at": .string("2026-09-15T15:41:39Z"),
+      "stale": .bool(false),
+      "events": .array([]),
+      "tweets": .array([]),
+      "radar_context": .array([
+        .object([
+          "id": .string("latest-post"),
+          "at": .string("2026-09-21T06:26:15Z"),
+          "text": .string("3am on a tuesday"),
+          "url": .string("https://x.com/thsottiaux/status/latest-post"),
+          "visibility_only": .bool(true),
+        ])
+      ]),
+    ])
+
+    let context = try AIInputBuilder.makeContext(bundle: source)
+    let data = try XCTUnwrap(context.data(using: .utf8))
+    let root = try XCTUnwrap(
+      try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+    let freshness = try XCTUnwrap(root["tibo_feed_freshness"] as? [String: Any])
+    let latestContext = try XCTUnwrap(root["recent_tibo_context"] as? [[String: Any]])
+
+    XCTAssertEqual(freshness["newest_post_at"] as? String, "2026-09-16T23:18:15Z")
+    XCTAssertEqual(freshness["signal_newest_post_at"] as? String, "2026-09-15T15:41:39Z")
+    XCTAssertEqual(latestContext.first?["id"] as? String, "latest-post")
+    XCTAssertEqual(
+      latestContext.first?["text"] as? String,
+      "3am on a tuesday"
+    )
+    XCTAssertEqual(
+      latestContext.first?["published_at_beijing"] as? String,
+      "2026-09-21T14:26:15+08:00"
+    )
+    XCTAssertEqual(
+      latestContext.first?["published_at_pacific"] as? String,
+      "2026-09-20T23:26:15-07:00"
+    )
+  }
+
+  func testInputContextIncludesReplyParentAndQuotedPost() throws {
+    var source = bundle()
+    source.payloads[.feed] = .object([
+      "events": .array([]),
+      "tweets": .array([
+        .object([
+          "id": .string("2101352781219258527"),
+          "at": .string("2026-09-19T16:48:38Z"),
+          "text": .string("OK fine. But it’s also still coming in Tuesday"),
+          "url": .string("https://x.com/thsottiaux/status/2101352781219258527"),
+          "is_reply": .bool(true),
+          "replying_to": .string("udiWertheimer"),
+          "in_reply_to_tweet_id": .string("2101093319501664368"),
+          "conversation_id": .string("2101093319501664368"),
+          "reply_context": .object([
+            "parent": .object([
+              "id": .string("2101093319501664368"),
+              "text": .string("you owe us a banked reset"),
+              "author_handle": .string("udiWertheimer"),
+            ]),
+            "quoted_post": .object([
+              "id": .string("2099744972195131850"),
+              "text": .string("This week will also be a level of ships."),
+              "author_handle": .string("thsottiaux"),
+            ]),
+          ]),
+        ])
+      ]),
+    ])
+
+    let context = try AIInputBuilder.makeContext(bundle: source)
+    let data = try XCTUnwrap(context.data(using: .utf8))
+    let root = try XCTUnwrap(
+      try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+    let posts = try XCTUnwrap(root["recent_tibo_posts"] as? [[String: Any]])
+    let reply = try XCTUnwrap(posts.first)
+    let replyContext = try XCTUnwrap(reply["reply_context"] as? [String: Any])
+    let parent = try XCTUnwrap(replyContext["parent"] as? [String: Any])
+    let quote = try XCTUnwrap(replyContext["quoted_post"] as? [String: Any])
+
+    XCTAssertEqual(reply["reply_context_status"] as? String, "available")
+    XCTAssertEqual(reply["replying_to"] as? String, "udiWertheimer")
+    XCTAssertEqual(parent["text"] as? String, "you owe us a banked reset")
+    XCTAssertEqual(quote["text"] as? String, "This week will also be a level of ships.")
+  }
+
+  func testInputMarksReplyContextMissingInsteadOfGuessing() throws {
+    var source = bundle()
+    source.payloads[.feed] = .object([
+      "events": .array([]),
+      "tweets": .array([
+        .object([
+          "id": .string("reply"),
+          "text": .string("OK fine. It is coming Tuesday."),
+          "is_reply": .bool(true),
+          "in_reply_to_tweet_id": .string("parent"),
+        ])
+      ]),
+    ])
+
+    let context = try AIInputBuilder.makeContext(bundle: source)
+
+    XCTAssertTrue(context.contains("\"reply_context_status\":\"missing\""))
+  }
+
+  func testSnapshotOrdersEvidenceByVerifiedSourceDate() throws {
+    let oldURL = "https://x.com/thsottiaux/status/old"
+    let newURL = "https://x.com/thsottiaux/status/new"
+    var source = bundle()
+    source.payloads[.feed] = .object([
+      "fetched_at": .string("2026-09-17T01:19:58Z"),
+      "events": .array([]),
+      "tweets": .array([
+        .object([
+          "id": .string("new"),
+          "at": .string("2026-09-16T23:18:15Z"),
+          "text": .string("Newer public source"),
+          "url": .string(newURL),
+        ]),
+        .object([
+          "id": .string("old"),
+          "at": .string("2026-09-11T06:39:40Z"),
+          "text": .string("Older background source"),
+          "url": .string(oldURL),
+        ]),
+      ]),
+    ])
+    let analysis = makeAnalysis(evidence: [
+      AIAnalysisEvidence(
+        label: "旧背景",
+        detail: "较早的长期立场。",
+        category: "context",
+        sourceURL: oldURL
+      ),
+      AIAnalysisEvidence(
+        label: "无日期依据",
+        detail: "来源没有可验证时间。",
+        category: "context",
+        sourceURL: nil
+      ),
+      AIAnalysisEvidence(
+        label: "最新动态",
+        detail: "最近仍然活跃，但没有新的重置预告。",
+        category: "negative",
+        sourceURL: newURL
+      ),
+    ])
+
+    let snapshot = try analysis.validated().snapshot(
+      bundle: source,
+      now: ISO8601DateFormatter().date(from: "2026-09-17T02:00:00Z")!
+    )
+
+    XCTAssertEqual(snapshot.evidence.map(\.label), ["最新动态", "旧背景", "无日期依据"])
+    XCTAssertEqual(
+      snapshot.evidence.first?.sourceDate,
+      ISO8601DateFormatter().date(from: "2026-09-16T23:18:15Z")
+    )
+    XCTAssertNil(snapshot.evidence.last?.sourceDate)
+  }
+
+  func testEvidenceFromOlderSnapshotDecodesWithoutSourceDate() throws {
+    let data = try XCTUnwrap(
+      """
+      {
+        "id": "old-evidence",
+        "label": "旧快照依据",
+        "detail": "旧版本没有来源日期字段。",
+        "category": "context",
+        "delta": 0
+      }
+      """.data(using: .utf8)
+    )
+
+    let evidence = try JSONDecoder().decode(Evidence.self, from: data)
+
+    XCTAssertNil(evidence.sourceDate)
+  }
+
+  private func makeAnalysis(evidence: [AIAnalysisEvidence]? = nil) -> AIAnalysis {
     AIAnalysis(
       global24h: range(8, 15, 25),
       global48h: range(15, 28, 42),
@@ -156,7 +341,7 @@ final class AIAnalysisTests: XCTestCase {
       analysisNote: "历史基准偏低，近期只有间接暗示，因此范围保持较宽。",
       conditionalWindow: "暂无集中时段",
       summary: "未来两天仍可能突发重置，但目前没有明确预告。",
-      evidence: [
+      evidence: evidence ?? [
         AIAnalysisEvidence(
           label: "Tibo 暗示",
           detail: "语气指向未来，但没有明确说会重置。",

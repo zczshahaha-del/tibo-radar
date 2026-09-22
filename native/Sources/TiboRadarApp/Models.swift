@@ -31,6 +31,7 @@ struct Evidence: Identifiable, Codable, Equatable, Sendable {
   let category: String
   let delta: Int
   let sourceURL: URL?
+  let sourceDate: Date?
 
   init(
     id: String = UUID().uuidString,
@@ -38,7 +39,8 @@ struct Evidence: Identifiable, Codable, Equatable, Sendable {
     detail: String,
     category: String = "context",
     delta: Int = 0,
-    sourceURL: URL? = nil
+    sourceURL: URL? = nil,
+    sourceDate: Date? = nil
   ) {
     self.id = id
     self.label = label
@@ -46,6 +48,7 @@ struct Evidence: Identifiable, Codable, Equatable, Sendable {
     self.category = category
     self.delta = delta
     self.sourceURL = sourceURL
+    self.sourceDate = sourceDate
   }
 }
 
