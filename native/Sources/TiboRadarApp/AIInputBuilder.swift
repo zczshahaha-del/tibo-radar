@@ -9,15 +9,19 @@ enum AIInputBuilder {
   static func fingerprint(bundle: SourceBundle) throws -> String {
     let stableContext = try serializedContext(
       bundle: bundle,
-      now: Date(timeIntervalSince1970: 0)
+      now: Date(timeIntervalSince1970: 0),
+      includeHealthAssessment: false
     )
     return SHA256.hash(data: Data(stableContext.utf8))
       .map { String(format: "%02x", $0) }
       .joined()
   }
 
-  private static func serializedContext(bundle: SourceBundle, now: Date) throws -> String {
+  private static func serializedContext(
+    bundle: SourceBundle, now: Date, includeHealthAssessment: Bool = true
+  ) throws -> String {
     var context: [String: Any] = [
+      "analysis_policy_version": 2,
       "current_time": ISO8601DateFormatter().string(from: now),
       "timezone": "Asia/Shanghai",
     ]
@@ -62,6 +66,17 @@ enum AIInputBuilder {
       context["openai_status_incidents"] = trimmedArray(openAI["incidents"], limit: 15)
     }
     context["source_errors"] = bundle.errors
+    context["cached_sources"] = bundle.cacheFallbacks.map(\.rawValue).sorted()
+    if includeHealthAssessment {
+      context["source_health"] = SourceHealth.assess(bundle: bundle, now: now).map { health in
+        var item: [String: Any] = ["source": health.source.rawValue, "state": health.state.rawValue]
+        if let checkedAt = health.checkedAt {
+          item["checked_at"] = ISO8601DateFormatter().string(from: checkedAt)
+        }
+        if let warning = health.warning { item["warning"] = warning }
+        return item
+      }
+    }
 
     let data = try JSONSerialization.data(
       withJSONObject: context,
@@ -114,12 +129,18 @@ enum AIInputBuilder {
         selecting: [
           "id", "at", "declared_at", "text", "url", "is_reply",
           "replying_to", "in_reply_to_tweet_id", "conversation_id", "reply_context",
+          "display_kind", "visibility_only",
         ],
         from: post
       )
-      if post.bool("is_reply") == true {
+      let hasParentID = !(post.string("in_reply_to_tweet_id") ?? "").isEmpty
+      if post.bool("is_reply") == true || hasParentID {
+        result["is_reply"] = true
+        let parentText = post.object("reply_context")?.object("parent")?.string("text") ?? ""
         result["reply_context_status"] =
-          post.object("reply_context") == nil ? "missing" : "available"
+          parentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "missing" : "available"
+      } else if post.bool("is_reply") == nil {
+        result["reply_context_status"] = "unknown"
       }
       if let text = post.string("text") {
         result["text"] = boundedPostText(text)
@@ -134,18 +155,7 @@ enum AIInputBuilder {
     _ value: JSONValue?,
     limit: Int
   ) -> [[String: Any]] {
-    guard let values = value?.arrayValue else { return [] }
-    return values.prefix(limit).compactMap { value in
-      guard let post = value.objectValue else { return nil }
-      var result = jsonObject(
-        selecting: [
-          "id", "at", "text", "url", "display_kind", "visibility_only",
-        ],
-        from: post
-      )
-      appendLocalTimes(from: post, to: &result)
-      return result
-    }
+    recentTiboPosts(value, limit: limit)
   }
 
   private static func appendLocalTimes(
@@ -153,7 +163,7 @@ enum AIInputBuilder {
     to result: inout [String: Any]
   ) {
     guard let rawDate = post.string("at"),
-      let date = ISO8601DateFormatter().date(from: rawDate)
+      let date = SourceMetadata.parseDate(rawDate)
     else { return }
     result["published_at_beijing"] = formatted(date, timeZone: "Asia/Shanghai")
     result["published_at_pacific"] = formatted(date, timeZone: "America/Los_Angeles")

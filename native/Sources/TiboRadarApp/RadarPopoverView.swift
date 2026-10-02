@@ -69,6 +69,7 @@ struct RadarPopoverView: View {
           .font(.system(size: 11))
           .foregroundStyle(headerSubtitleColor)
           .lineLimit(1)
+          .help(model.snapshot?.sourceErrors.joined(separator: "\n") ?? "")
       }
 
       Spacer()

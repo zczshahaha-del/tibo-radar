@@ -22,6 +22,7 @@ struct SourceBundle: Sendable {
   var payloads: [RadarSource: JSONValue]
   var cacheFallbacks: Set<RadarSource>
   var errors: [String]
+  var receivedAt: [RadarSource: Date] = [:]
 }
 
 struct Evidence: Identifiable, Codable, Equatable, Sendable {

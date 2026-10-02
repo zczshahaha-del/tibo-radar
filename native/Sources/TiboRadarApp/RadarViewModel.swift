@@ -116,7 +116,8 @@ final class RadarViewModel: ObservableObject {
         sourceFingerprint: fingerprint,
         force: force
       ), let cached = snapshotStore.load(for: selectedProvider) {
-        snapshot = cached
+        let warnings = SourceHealth.assess(bundle: bundle).compactMap(\.warning) + bundle.errors
+        snapshot = warnings.isEmpty ? cached : cached.markedStale(reason: warnings.joined(separator: "；"))
         return
       }
       let analysis = try await analyzer.analyze(

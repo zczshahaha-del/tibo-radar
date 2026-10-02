@@ -4,6 +4,35 @@ import XCTest
 @testable import TiboRadarApp
 
 final class AIAnalysisTests: XCTestCase {
+  func testMissingFeedCannotBeHiddenByFreshForecast() {
+    var source = bundle()
+    source.payloads.removeValue(forKey: .feed)
+    source.errors = ["feed：无法获取且没有缓存"]
+    let now = SourceMetadata.parseDate("2026-09-10T12:30:00Z")!
+    XCTAssertTrue(makeAnalysis().snapshot(bundle: source, now: now).isStale)
+  }
+
+  func testOldFeedCannotBeHiddenByFreshForecast() {
+    var source = bundle()
+    source.payloads[.feed] = .object([
+      "fetched_at": .string("2026-09-09T12:00:00Z"), "tweets": .array([]),
+    ])
+    let now = SourceMetadata.parseDate("2026-09-10T12:30:00Z")!
+    XCTAssertTrue(makeAnalysis().snapshot(bundle: source, now: now).isStale)
+  }
+
+  func testContextReplyWithoutParentIsMarkedMissing() throws {
+    var source = bundle()
+    source.payloads[.feed] = .object([
+      "radar_context": .array([.object([
+        "id": .string("123"), "text": .string("Wednesday at 4am"),
+        "is_reply": .bool(true), "in_reply_to_tweet_id": .string("456"),
+      ])])
+    ])
+    let input = try AIInputBuilder.makeContext(bundle: source)
+    XCTAssertTrue(input.contains("\"reply_context_status\":\"missing\""))
+  }
+
   func testAnalysisBuildsProbabilitySnapshot() throws {
     let snapshot = try makeAnalysis().validated().snapshot(
       bundle: bundle(),
@@ -359,6 +388,8 @@ final class AIAnalysisTests: XCTestCase {
   private func bundle() -> SourceBundle {
     SourceBundle(
       payloads: [
+        .status: .object(["checked_at": .string("2026-09-10T12:00:00Z"), "incidents": .array([])]),
+        .openAIStatus: .object(["checked_at": .string("2026-09-10T12:00:00Z"), "incidents": .array([])]),
         .forecast: .object([
           "last_reset_at": .string("2026-09-09T00:00:00Z"),
           "updated_at": .string("2026-09-10T12:00:00Z"),

@@ -84,7 +84,8 @@ struct AIAnalysis: Codable, Equatable, Sendable {
     now: Date = Date()
   ) -> PredictionSnapshot {
     let metadata = SourceMetadata(bundle: bundle)
-    let stale = !bundle.cacheFallbacks.isEmpty || metadata.isOlderThanFourHours(now: now)
+    let warnings = SourceHealth.assess(bundle: bundle, now: now).compactMap(\.warning)
+    let stale = !warnings.isEmpty || !bundle.errors.isEmpty
     let calibration = ProbabilityCalibration.evaluate(bundle: bundle)
     let sourceIndex = EvidenceSourceIndex(bundle: bundle)
     var mappedEvidence = evidence.prefix(6).enumerated().map { index, item in
@@ -129,7 +130,7 @@ struct AIAnalysis: Codable, Equatable, Sendable {
       combined48h: combined48h,
       affectedUserBanked24h: affectedUserBanked24h,
       usageAdvice: usageAdvice,
-      analysisNote: stale ? "部分公开来源来自缓存。\(analysisNote)" : analysisNote,
+      analysisNote: stale ? "部分公开来源缺失或新鲜度不足。\(analysisNote)" : analysisNote,
       summary: summary,
       conditionalWindow: conditionalWindow,
       historicalBaseline: calibration.estimate,
@@ -139,7 +140,7 @@ struct AIAnalysis: Codable, Equatable, Sendable {
       isStale: stale,
       evidence: mappedEvidence,
       latestEvents: metadata.latestEvents,
-      sourceErrors: bundle.errors
+      sourceErrors: Array(Set(bundle.errors + warnings)).sorted()
     )
   }
 
@@ -283,17 +284,8 @@ struct SourceMetadata: Sendable {
   init(bundle: SourceBundle) {
     let forecast = bundle.payloads[.forecast]?.objectValue ?? [:]
     lastResetAt = Self.parseDate(forecast.string("last_reset_at"))
-    dataUpdatedAt = bundle.payloads.values.compactMap { payload in
-      guard let object = payload.objectValue else { return nil }
-      return ["updated_at", "fetched_at", "checked_at", "newest_post_at"]
-        .compactMap { Self.parseDate(object.string($0)) }
-        .max()
-    }.max()
+    dataUpdatedAt = SourceHealth.assess(bundle: bundle).compactMap(\.checkedAt).min()
     latestEvents = Self.extractEvents(bundle: bundle)
-  }
-
-  func isOlderThanFourHours(now: Date) -> Bool {
-    dataUpdatedAt.map { now.timeIntervalSince($0) > 4 * 60 * 60 } ?? true
   }
 
   private static func extractEvents(bundle: SourceBundle) -> [RadarEvent] {
