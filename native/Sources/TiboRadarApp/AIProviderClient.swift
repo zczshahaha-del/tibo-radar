@@ -184,7 +184,7 @@ final class AIProviderClient: AIAnalyzing, @unchecked Sendable {
 
       你必须每次都预测，不能用“没有新信号”代替概率，也不能因为没有新信号就返回全零。没有新信号时，概率应保留在合理的历史基准附近；明确预告、强暗示或反面证据可以改变范围，但必须在 analysis_note 里直说原因。
 
-      每个概率使用 lower、likely、upper 三个整数表达范围。全局重置、普发重置卡和两者至少发生一种的 24/48 小时范围都必须为 1–99，且 lower ≤ likely ≤ upper。48 小时累计概率不能低于对应的 24 小时概率；combined 必须不低于 global 和 banked。定向故障补发只针对受影响用户，不得混入 combined；没有对应人群时返回 null。
+      每个概率使用 lower、likely、upper 三个整数表达范围。全局重置、普发重置卡和两者至少发生一种的 24/48 小时范围都必须为 1–99，且 lower ≤ likely ≤ upper。48 小时累计概率不能低于对应的 24 小时概率；combined 必须不低于 global 和 banked。同一时间范围内，combined.likely 不得超过 global.likely + banked.likely，combined.upper 不得超过 global.upper + banked.upper，且不得超过 100。定向故障补发只针对受影响用户，不得混入 combined；没有对应人群时返回 null。
 
       已经发生的重置只能作为历史，不得冒充未来事件。文字说明中不要重复百分比，数字只放在结构化范围字段里。
 

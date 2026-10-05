@@ -4,6 +4,23 @@ import XCTest
 @testable import TiboRadarApp
 
 final class AIAnalysisTests: XCTestCase {
+  func testCombinedProbabilityCannotExceedSumOfCategories() {
+    func analysis(_ combined: ForecastProbabilityRange) -> AIAnalysis {
+      AIAnalysis(
+        global24h: range(5, 10, 15), global48h: range(5, 10, 15),
+        banked24h: range(5, 10, 15), banked48h: range(5, 10, 15),
+        combined24h: combined, combined48h: combined, affectedUserBanked24h: nil,
+        usageAdvice: .watch, analysisNote: "test", conditionalWindow: "unknown",
+        summary: "test", evidence: []
+      )
+    }
+    XCTAssertThrowsError(try analysis(range(10, 80, 90)).validated())
+    XCTAssertThrowsError(try analysis(range(10, 21, 30)).validated())
+    XCTAssertThrowsError(try analysis(range(10, 20, 31)).validated())
+    XCTAssertNoThrow(try analysis(range(10, 20, 30)).validated())
+    XCTAssertNoThrow(try analysis(range(5, 10, 15)).validated())
+  }
+
   func testMissingFeedCannotBeHiddenByFreshForecast() {
     var source = bundle()
     source.payloads.removeValue(forKey: .feed)

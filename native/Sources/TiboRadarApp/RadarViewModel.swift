@@ -20,6 +20,7 @@ final class RadarViewModel: ObservableObject {
   private let refreshGate: AIRefreshGate
   private let notifications: NotificationManager
   private var refreshTimer: Timer?
+  private var configurationRevision = UUID()
 
   init(
     client: RadarClient = RadarClient(),
@@ -28,7 +29,8 @@ final class RadarViewModel: ObservableObject {
     preferences: ProviderPreferences = ProviderPreferences(),
     snapshotStore: AISnapshotStore = AISnapshotStore(),
     refreshGate: AIRefreshGate = AIRefreshGate(),
-    notifications: NotificationManager = NotificationManager()
+    notifications: NotificationManager = NotificationManager(),
+    startAutomatically: Bool = true
   ) {
     self.client = client
     self.analyzer = analyzer
@@ -49,6 +51,7 @@ final class RadarViewModel: ObservableObject {
       snapshot = snapshot?.markedStale(reason: "当前没有可用的 API Key，显示的是上次 AI 结果。")
     }
 
+    guard startAutomatically else { return }
     Task { [weak self] in
       guard let self, self.hasAPIKey else { return }
       await self.notifications.prepareAuthorization()
@@ -97,16 +100,20 @@ final class RadarViewModel: ObservableObject {
 
     isRefreshing = true
     lastError = nil
-    defer { isRefreshing = false }
+    let revision = configurationRevision
+    defer {
+      if configurationRevision == revision { isRefreshing = false }
+    }
 
     let configuration = AIConfiguration(
       provider: selectedProvider,
       model: selectedModel
     )
     let bundle = await client.fetchAll()
+    guard configurationRevision == revision else { return }
 
     do {
-      if selectedProvider == .deepSeek, bundle.payloads.isEmpty {
+      if configuration.provider == .deepSeek, bundle.payloads.isEmpty {
         throw AIProviderError.invalidAnalysis("没有获取到可供 DeepSeek 判断的公开资料。")
       }
       let context = try AIInputBuilder.makeContext(bundle: bundle)
@@ -115,7 +122,7 @@ final class RadarViewModel: ObservableObject {
         configuration: configuration,
         sourceFingerprint: fingerprint,
         force: force
-      ), let cached = snapshotStore.load(for: selectedProvider) {
+      ), let cached = snapshotStore.load(for: configuration.provider) {
         let warnings = SourceHealth.assess(bundle: bundle).compactMap(\.warning) + bundle.errors
         snapshot = warnings.isEmpty ? cached : cached.markedStale(reason: warnings.joined(separator: "；"))
         return
@@ -125,6 +132,7 @@ final class RadarViewModel: ObservableObject {
         configuration: configuration,
         apiKey: apiKey
       )
+      guard configurationRevision == revision else { return }
       let next = analysis.snapshot(bundle: bundle)
       snapshot = next
       try snapshotStore.save(next, configuration: configuration)
@@ -134,9 +142,10 @@ final class RadarViewModel: ObservableObject {
       )
       await notifications.process(next)
     } catch {
+      guard configurationRevision == revision else { return }
       let message = Self.displayMessage(for: error)
       lastError = message
-      if let cached = snapshotStore.load(for: selectedProvider) {
+      if let cached = snapshotStore.load(for: configuration.provider) {
         snapshot = cached.markedStale(reason: "AI 刷新失败：\(message)")
       } else {
         snapshot = nil
@@ -145,6 +154,7 @@ final class RadarViewModel: ObservableObject {
   }
 
   func useProvider(_ provider: AIProvider) {
+    invalidateRefresh()
     selectedProvider = provider
     selectedModel = preferences.model(for: provider)
     hasAPIKey = (try? credentials.read(for: provider)) != nil
@@ -170,13 +180,13 @@ final class RadarViewModel: ObservableObject {
   ) -> Bool {
     do {
       let cleanedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
-      preferences.save(provider: provider, model: cleanedModel)
       let cleanedKey = newAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
       if !cleanedKey.isEmpty {
         try credentials.save(cleanedKey, for: provider)
       } else if (try credentials.read(for: provider)) == nil {
         throw APIKeyStoreError.emptyKey
       }
+      preferences.save(provider: provider, model: cleanedModel)
       useProvider(provider)
       selectedModel = preferences.model(for: provider)
       hasAPIKey = true
@@ -219,6 +229,7 @@ final class RadarViewModel: ObservableObject {
     do {
       try credentials.delete(for: provider)
       if selectedProvider == provider {
+        invalidateRefresh()
         hasAPIKey = false
         lastError = "已删除 \(provider.displayName) API Key。"
       }
@@ -226,6 +237,12 @@ final class RadarViewModel: ObservableObject {
     } catch {
       settingsMessage = Self.displayMessage(for: error)
     }
+  }
+
+  private func invalidateRefresh() {
+    // Even switching away and back must invalidate the previous request.
+    configurationRevision = UUID()
+    isRefreshing = false
   }
 
   private static func displayMessage(for error: Error) -> String {

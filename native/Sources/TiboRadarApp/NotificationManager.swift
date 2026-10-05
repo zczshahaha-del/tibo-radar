@@ -56,7 +56,7 @@ actor NotificationManager {
     )
   }
 
-  func process(_ snapshot: PredictionSnapshot, threshold: Int = 65) async {
+  func decisionAndRecord(_ snapshot: PredictionSnapshot, threshold: Int = 65) -> NotificationDecision? {
     let previousProbability = defaults.object(forKey: "previousAICombined24h") as? Int
     let previousEventIDs = Set(
       defaults.stringArray(forKey: "previousEventIDs") ?? []
@@ -69,9 +69,14 @@ actor NotificationManager {
     )
 
     defaults.set(snapshot.combined24h.likely, forKey: "previousAICombined24h")
-    defaults.set(snapshot.latestEvents.map(\.id), forKey: "previousEventIDs")
+    // Keep the existing key so upgrades preserve the history already recorded.
+    let seenEventIDs = previousEventIDs.union(snapshot.latestEvents.map(\.id))
+    defaults.set(seenEventIDs.sorted(), forKey: "previousEventIDs")
+    return decision
+  }
 
-    guard let decision else { return }
+  func process(_ snapshot: PredictionSnapshot, threshold: Int = 65) async {
+    guard let decision = decisionAndRecord(snapshot, threshold: threshold) else { return }
     let center = UNUserNotificationCenter.current()
     do {
       let granted = try await center.requestAuthorization(options: [.alert, .sound])

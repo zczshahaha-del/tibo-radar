@@ -197,6 +197,11 @@ struct AIAnalysis: Codable, Equatable, Sendable {
     else {
       throw AIProviderError.invalidAnalysis("AI 返回的 \(name) 综合概率低于分类概率。")
     }
+    guard combined.likely <= min(100, global.likely + banked.likely),
+      combined.upper <= min(100, global.upper + banked.upper)
+    else {
+      throw AIProviderError.invalidAnalysis("AI 返回的 \(name) 综合概率超过分类概率之和。")
+    }
   }
 
   private static func baselineNote(

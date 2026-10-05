@@ -4,6 +4,37 @@ import XCTest
 @testable import TiboRadarApp
 
 final class NotificationPolicyTests: XCTestCase {
+  func testSeenEventsSurviveEmptyPollAndManagerRestart() async {
+    let suite = "TiboRadar.notification-test.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let event = RadarEvent(id: "old", kind: "reset", title: "old", occurredAt: nil, sourceURL: nil, state: nil)
+    let manager = NotificationManager(defaults: UserDefaults(suiteName: suite)!)
+    let first = await manager.decisionAndRecord(snapshot(likely: 15, events: [event]))
+    XCTAssertNil(first)
+    let empty = await manager.decisionAndRecord(snapshot(likely: 15))
+    XCTAssertNil(empty)
+    let restarted = NotificationManager(defaults: UserDefaults(suiteName: suite)!)
+    let repeated = await restarted.decisionAndRecord(snapshot(likely: 15, events: [event]))
+    XCTAssertNil(repeated)
+    let newEvent = RadarEvent(id: "new", kind: "banked", title: "new", occurredAt: nil, sourceURL: nil, state: nil)
+    let fresh = await restarted.decisionAndRecord(snapshot(likely: 15, events: [newEvent]))
+    XCTAssertEqual(fresh?.body, "new")
+  }
+
+  func testExistingNotificationHistoryIsPreserved() async {
+    let suite = "TiboRadar.notification-test.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    defaults.set(15, forKey: "previousAICombined24h")
+    defaults.set(["legacy"], forKey: "previousEventIDs")
+    let manager = NotificationManager(defaults: UserDefaults(suiteName: suite)!)
+    _ = await manager.decisionAndRecord(snapshot(likely: 15))
+    let event = RadarEvent(id: "legacy", kind: "reset", title: "old", occurredAt: nil, sourceURL: nil, state: nil)
+    let result = await manager.decisionAndRecord(snapshot(likely: 15, events: [event]))
+    XCTAssertNil(result)
+  }
+
   func testFirstRunIsSilent() {
     let decision = NotificationPolicy.decide(
       previousProbability: nil,
