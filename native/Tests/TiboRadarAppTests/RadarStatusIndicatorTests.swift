@@ -17,14 +17,14 @@ final class RadarStatusIndicatorTests: XCTestCase {
     }
   }
 
-  func testMissingInvalidOrStalePredictionsAreNotPresentedAsLowProbability() {
+  func testMissingOrInvalidResultsAreGrayWhileStaleResultsKeepTheirColor() {
     for value: Int? in [nil, -1, 101] {
       XCTAssertEqual(RadarIndicatorState(probability: value).level, .unavailable)
     }
-    let stale = RadarIndicatorState(probability: 92, isStale: true)
-    XCTAssertEqual(stale.level, .unavailable)
-    XCTAssertTrue(stale.toolTip.contains("预测已过期"))
-    XCTAssertTrue(stale.toolTip.contains("上次"))
+    let stale = RadarIndicatorState(probability: 47, isStale: true)
+    XCTAssertEqual(stale.level, .medium)
+    XCTAssertTrue(stale.toolTip.contains("来源或刷新异常"))
+    XCTAssertTrue(stale.toolTip.contains("47%"))
   }
 
   func testToolTipExplainsColorAndCurrentProbability() {
@@ -90,7 +90,10 @@ final class RadarStatusIndicatorTests: XCTestCase {
     XCTAssertTrue(button.toolTip?.contains("黄色") == true)
     states.send(RadarIndicatorState(probability: 92))
     XCTAssertTrue(button.toolTip?.contains("红色") == true)
-    states.send(RadarIndicatorState(probability: 92, isStale: true))
+    states.send(RadarIndicatorState(probability: 47, isStale: true))
+    XCTAssertTrue(button.toolTip?.contains("黄色") == true)
+    XCTAssertTrue(button.toolTip?.contains("来源或刷新异常") == true)
+    states.send(RadarIndicatorState(probability: nil))
     XCTAssertTrue(button.toolTip?.contains("灰色") == true)
     XCTAssertTrue(button.target === target)
     XCTAssertEqual(button.action, action)

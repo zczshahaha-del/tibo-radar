@@ -340,7 +340,7 @@ struct RadarPopoverView: View {
   }
 
   private var indicatorColor: Color {
-    Color(RadarIndicatorState(snapshot: model.hasAPIKey ? model.snapshot : nil).color)
+    Color(RadarIndicatorState(snapshot: model.snapshot).color)
   }
 
   private var panelHeight: CGFloat {

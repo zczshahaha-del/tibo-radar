@@ -41,7 +41,7 @@ struct RadarIndicatorState: Equatable, Sendable {
   }
 
   var level: RadarIndicatorLevel {
-    guard !isStale, let probability, (0...100).contains(probability) else { return .unavailable }
+    guard let probability, (0...100).contains(probability) else { return .unavailable }
     switch probability {
     case ..<40: return .low
     case ..<70: return .medium
@@ -50,13 +50,11 @@ struct RadarIndicatorState: Equatable, Sendable {
   }
 
   var toolTip: String {
-    if level == .unavailable {
-      if isStale, let probability {
-        return "Tibo Radar：预测已过期 · 灰色（上次 24 小时综合概率 \(probability)%）"
-      }
+    guard level != .unavailable, let probability else {
       return "Tibo Radar：\(level.label)"
     }
-    return "Tibo Radar：24 小时综合概率 \(probability!)% · \(level.label)"
+    let description = "Tibo Radar：24 小时综合概率 \(probability)% · \(level.label)"
+    return isStale ? description + "（来源或刷新异常，请查看面板提示）" : description
   }
 
   @MainActor

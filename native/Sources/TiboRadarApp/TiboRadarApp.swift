@@ -34,9 +34,9 @@ final class TiboRadarAppDelegate: NSObject, NSApplicationDelegate {
     if let button = statusItem.button {
       button.target = self
       button.action = #selector(togglePopover(_:))
-      let states = model.$snapshot.combineLatest(model.$hasAPIKey)
-        .map { snapshot, hasAPIKey in
-          RadarIndicatorState(snapshot: hasAPIKey ? snapshot : nil)
+      let states = model.$snapshot
+        .map { snapshot in
+          RadarIndicatorState(snapshot: snapshot)
         }
         .eraseToAnyPublisher()
       statusPresenter = RadarStatusItemPresenter(button: button, states: states)
