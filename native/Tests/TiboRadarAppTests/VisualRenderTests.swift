@@ -168,7 +168,31 @@ final class VisualRenderTests: XCTestCase {
     let view = RadarPopoverView(initiallyShowingSettings: true)
       .environmentObject(model)
       .environment(\.colorScheme, .dark)
-    try render(view, size: CGSize(width: 344, height: 350), to: outputPath)
+    try renderHosted(view, size: CGSize(width: 344, height: 350), to: outputPath)
+  }
+
+  @MainActor
+  private func renderHosted<V: View>(_ view: V, size: CGSize, to outputPath: String) throws {
+    // ImageRenderer cannot draw native text fields; render the actual hosted view offscreen.
+    let controller = NSHostingController(rootView: view)
+    controller.sizingOptions = []
+    let window = NSWindow(
+      contentRect: NSRect(origin: .zero, size: size),
+      styleMask: [.borderless],
+      backing: .buffered,
+      defer: false
+    )
+    window.isReleasedWhenClosed = false
+    window.contentViewController = controller
+    defer { window.close() }
+    controller.view.frame = NSRect(origin: .zero, size: size)
+    controller.view.layoutSubtreeIfNeeded()
+    RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.05))
+    let bitmap = try XCTUnwrap(controller.view.bitmapImageRepForCachingDisplay(in: controller.view.bounds))
+    controller.view.cacheDisplay(in: controller.view.bounds, to: bitmap)
+    let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+    try png.write(to: URL(fileURLWithPath: outputPath), options: .atomic)
+    XCTAssertGreaterThan(png.count, 10_000)
   }
 
   @MainActor

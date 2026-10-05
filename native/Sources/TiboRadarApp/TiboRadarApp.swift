@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 @main
@@ -21,6 +22,7 @@ enum TiboRadarApplication {
 final class TiboRadarAppDelegate: NSObject, NSApplicationDelegate {
   private let popoverController = RadarPopoverController()
   private var statusItem: NSStatusItem?
+  private var statusPresenter: RadarStatusItemPresenter?
   private var model: RadarViewModel?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
@@ -30,14 +32,14 @@ final class TiboRadarAppDelegate: NSObject, NSApplicationDelegate {
     let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     self.statusItem = statusItem
     if let button = statusItem.button {
-      button.image = NSImage(
-        systemSymbolName: "dot.radiowaves.up.forward",
-        accessibilityDescription: "Tibo Radar"
-      )
-      button.image?.isTemplate = true
       button.target = self
       button.action = #selector(togglePopover(_:))
-      button.toolTip = "Tibo Radar"
+      let states = model.$snapshot.combineLatest(model.$hasAPIKey)
+        .map { snapshot, hasAPIKey in
+          RadarIndicatorState(snapshot: hasAPIKey ? snapshot : nil)
+        }
+        .eraseToAnyPublisher()
+      statusPresenter = RadarStatusItemPresenter(button: button, states: states)
     }
 
     let rootView = RadarPopoverView { [weak self] height in

@@ -55,10 +55,10 @@ struct RadarPopoverView: View {
   private var header: some View {
     HStack(spacing: 10) {
       ZStack {
-        Circle().fill(Color.green.opacity(0.13))
+        Circle().fill(indicatorColor.opacity(0.13))
         Image(systemName: "dot.radiowaves.up.forward")
           .font(.system(size: 16, weight: .semibold))
-          .foregroundStyle(.green)
+          .foregroundStyle(indicatorColor)
       }
       .frame(width: 32, height: 32)
 
@@ -337,6 +337,10 @@ struct RadarPopoverView: View {
   private var headerSubtitleColor: Color {
     if !model.hasAPIKey || model.snapshot?.isStale == true { return .orange }
     return .secondary
+  }
+
+  private var indicatorColor: Color {
+    Color(RadarIndicatorState(snapshot: model.hasAPIKey ? model.snapshot : nil).color)
   }
 
   private var panelHeight: CGFloat {
