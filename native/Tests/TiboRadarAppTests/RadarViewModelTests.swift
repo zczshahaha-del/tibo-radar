@@ -48,7 +48,7 @@ private actor SuspendedAnalyzer: AIAnalyzing {
 
 final class RadarViewModelTests: XCTestCase {
   @MainActor
-  private func fixture() throws -> (
+  private func fixture(history: RadarHistoryStore? = nil) throws -> (
     RadarViewModel, SuspendedAnalyzer, ViewModelKeys, ProviderPreferences, AISnapshotStore, () -> Void
   ) {
     let suite = "TiboRadar.viewmodel-test.\(UUID().uuidString)"
@@ -62,12 +62,89 @@ final class RadarViewModelTests: XCTestCase {
     let preferences = ProviderPreferences(defaults: defaults)
     let store = AISnapshotStore(directory: root.appendingPathComponent("snapshots"))
     let model = RadarViewModel(client: client, analyzer: analyzer, credentials: keys,
-      preferences: preferences, snapshotStore: store, refreshGate: AIRefreshGate(defaults: defaults),
+      preferences: preferences, snapshotStore: store,
+      historyStore: history ?? RadarHistoryStore(directory: root.appendingPathComponent("history")),
+      refreshGate: AIRefreshGate(defaults: defaults),
       notifications: NotificationManager(defaults: UserDefaults(suiteName: suite)!), startAutomatically: false)
     return (model, analyzer, keys, preferences, store, {
       defaults.removePersistentDomain(forName: suite)
       try? FileManager.default.removeItem(at: root)
     })
+  }
+
+  @MainActor
+  func testUnchangedAutomaticRefreshReusesPredictionAndRecordsHistory() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let history = RadarHistoryStore(directory: directory)
+    let (model, analyzer, _, _, _, cleanup) = try fixture(history: history)
+    defer { cleanup() }
+    let task = Task { await model.refresh() }
+    await analyzer.waitForRequest()
+    await analyzer.finish(.success(analysis()))
+    await task.value
+    let generatedAt = model.snapshot?.generatedAt
+    await model.refresh(force: false)
+    XCTAssertEqual(model.snapshot?.generatedAt, generatedAt)
+    XCTAssertEqual(try history.load().map(\.event), [.startup, .refreshSucceeded, .refreshReused])
+  }
+
+  @MainActor
+  func testHistoryRecordsStartupSuccessAndFailureWithDisplayedResult() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let history = RadarHistoryStore(directory: directory)
+    let (model, analyzer, _, _, _, cleanup) = try fixture(history: history)
+    defer { cleanup() }
+    let success = Task { await model.refresh() }
+    await analyzer.waitForRequest()
+    await analyzer.finish(.success(analysis()))
+    await success.value
+    let failure = Task { await model.refresh() }
+    await analyzer.waitForRequest(count: 2)
+    await analyzer.finish(.failure(AIProviderError.unauthorized))
+    await failure.value
+    let entries = try history.load()
+    XCTAssertEqual(entries.map(\.event), [.startup, .refreshSucceeded, .refreshFailed])
+    XCTAssertEqual(entries.map(\.color), [.unavailable, .low, .low])
+    XCTAssertEqual(entries.last?.snapshot?.combined24h.likely, 10)
+    XCTAssertEqual(entries.last?.snapshot?.isStale, true)
+    XCTAssertNotNil(entries.last?.error)
+  }
+
+  @MainActor
+  func testObsoleteRequestDoesNotEnterHistory() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let history = RadarHistoryStore(directory: directory)
+    let (model, analyzer, _, _, _, cleanup) = try fixture(history: history)
+    defer { cleanup() }
+    let task = Task { await model.refresh() }
+    await analyzer.waitForRequest()
+    model.useProvider(.qwen)
+    await analyzer.finish(.success(analysis()))
+    await task.value
+    let entries = try history.load()
+    XCTAssertEqual(entries.map(\.event), [.startup, .providerChanged])
+    XCTAssertEqual(entries.map(\.provider), [.deepSeek, .qwen])
+  }
+
+  @MainActor
+  func testHistoryWriteFailureDoesNotDiscardSuccessfulPrediction() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let file = directory.appendingPathComponent("file")
+    try Data().write(to: file)
+    let history = RadarHistoryStore(directory: file)
+    let (model, analyzer, _, _, _, cleanup) = try fixture(history: history)
+    defer { cleanup() }
+    let task = Task { await model.refresh() }
+    await analyzer.waitForRequest()
+    await analyzer.finish(.success(analysis()))
+    await task.value
+    XCTAssertEqual(model.snapshot?.combined24h.likely, 10)
+    XCTAssertNil(model.lastError)
   }
 
   @MainActor

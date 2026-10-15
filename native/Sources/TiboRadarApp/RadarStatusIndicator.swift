@@ -1,11 +1,11 @@
 import AppKit
 import Combine
 
-enum RadarIndicatorLevel: Equatable, Sendable {
-  case low
-  case medium
-  case high
-  case unavailable
+enum RadarIndicatorLevel: String, Codable, Equatable, Sendable {
+  case low = "green"
+  case medium = "yellow"
+  case high = "red"
+  case unavailable = "gray"
 
   @MainActor
   var color: NSColor {

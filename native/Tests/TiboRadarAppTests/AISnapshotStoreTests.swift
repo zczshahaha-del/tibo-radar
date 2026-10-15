@@ -20,6 +20,24 @@ final class AISnapshotStoreTests: XCTestCase {
     XCTAssertNil(store.load(for: .qwen))
   }
 
+  func testLegacyDeltaFieldDoesNotBreakSnapshotCache() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = AISnapshotStore(directory: directory)
+    let configuration = AIConfiguration(provider: .deepSeek, model: "test")
+    try store.save(makeSnapshot(), configuration: configuration)
+    let url = directory.appendingPathComponent("deepseek.json")
+    var archive = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+    var cached = try XCTUnwrap(archive["snapshot"] as? [String: Any])
+    cached["evidence"] = [["id": "old", "label": "old", "detail": "old detail", "category": "context", "delta": 0]]
+    archive["snapshot"] = cached
+    try JSONSerialization.data(withJSONObject: archive).write(to: url)
+    let loaded = try XCTUnwrap(store.load(for: .deepSeek))
+    XCTAssertEqual(loaded.evidence.first?.detail, "old detail")
+    try store.save(loaded, configuration: configuration)
+    XCTAssertFalse(try String(contentsOf: url, encoding: .utf8).contains("\"delta\""))
+  }
+
   private func makeSnapshot() -> PredictionSnapshot {
     PredictionSnapshot(
       generatedAt: Date(timeIntervalSince1970: 1),

@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import SwiftUI
 
 @MainActor
@@ -17,10 +18,12 @@ final class RadarViewModel: ObservableObject {
   private let credentials: any APIKeyStoring
   private let preferences: ProviderPreferences
   private let snapshotStore: AISnapshotStore
+  private let historyStore: RadarHistoryStore
   private let refreshGate: AIRefreshGate
   private let notifications: NotificationManager
   private var refreshTimer: Timer?
   private var configurationRevision = UUID()
+  private static let logger = Logger(subsystem: "com.zc.tiboradar", category: "history")
 
   init(
     client: RadarClient = RadarClient(),
@@ -28,6 +31,7 @@ final class RadarViewModel: ObservableObject {
     credentials: any APIKeyStoring = KeychainAPIKeyStore(),
     preferences: ProviderPreferences = ProviderPreferences(),
     snapshotStore: AISnapshotStore = AISnapshotStore(),
+    historyStore: RadarHistoryStore = RadarHistoryStore(),
     refreshGate: AIRefreshGate = AIRefreshGate(),
     notifications: NotificationManager = NotificationManager(),
     startAutomatically: Bool = true
@@ -37,6 +41,7 @@ final class RadarViewModel: ObservableObject {
     self.credentials = credentials
     self.preferences = preferences
     self.snapshotStore = snapshotStore
+    self.historyStore = historyStore
     self.refreshGate = refreshGate
     self.notifications = notifications
 
@@ -51,6 +56,7 @@ final class RadarViewModel: ObservableObject {
       snapshot = snapshot?.markedStale(reason: "当前没有可用的 API Key，显示的是上次 AI 结果。")
     }
 
+    recordHistory(.startup, error: lastError)
     guard startAutomatically else { return }
     Task { [weak self] in
       guard let self, self.hasAPIKey else { return }
@@ -83,6 +89,7 @@ final class RadarViewModel: ObservableObject {
     credentials = KeychainAPIKeyStore()
     preferences = ProviderPreferences()
     snapshotStore = AISnapshotStore()
+    historyStore = RadarHistoryStore()
     refreshGate = AIRefreshGate()
     notifications = NotificationManager()
   }
@@ -95,6 +102,7 @@ final class RadarViewModel: ObservableObject {
       snapshot = snapshotStore.load(for: selectedProvider)?.markedStale(
         reason: "缺少 API Key，无法生成新的 AI 判断。"
       )
+      recordHistory(.refreshFailed, error: lastError)
       return
     }
 
@@ -125,6 +133,7 @@ final class RadarViewModel: ObservableObject {
       ), let cached = snapshotStore.load(for: configuration.provider) {
         let warnings = SourceHealth.assess(bundle: bundle).compactMap(\.warning) + bundle.errors
         snapshot = warnings.isEmpty ? cached : cached.markedStale(reason: warnings.joined(separator: "；"))
+        recordHistory(.refreshReused)
         return
       }
       let analysis = try await analyzer.analyze(
@@ -140,6 +149,7 @@ final class RadarViewModel: ObservableObject {
         configuration: configuration,
         sourceFingerprint: fingerprint
       )
+      recordHistory(.refreshSucceeded)
       await notifications.process(next)
     } catch {
       guard configurationRevision == revision else { return }
@@ -150,6 +160,7 @@ final class RadarViewModel: ObservableObject {
       } else {
         snapshot = nil
       }
+      recordHistory(.refreshFailed, error: message)
     }
   }
 
@@ -162,6 +173,7 @@ final class RadarViewModel: ObservableObject {
     snapshot = snapshotStore.load(for: provider)
     lastError = hasAPIKey ? nil : "还没有 \(provider.displayName) API Key。"
     settingsMessage = nil
+    recordHistory(.providerChanged, error: lastError)
   }
 
   func modelName(for provider: AIProvider) -> String {
@@ -243,6 +255,19 @@ final class RadarViewModel: ObservableObject {
     // Even switching away and back must invalidate the previous request.
     configurationRevision = UUID()
     isRefreshing = false
+  }
+
+  private func recordHistory(_ event: RadarHistoryEntry.Event, error: String? = nil) {
+    do {
+      try historyStore.record(
+        event: event,
+        configuration: AIConfiguration(provider: selectedProvider, model: selectedModel),
+        snapshot: snapshot, error: error
+      )
+    } catch {
+      // Diagnostic storage failures must not change a valid prediction or its color.
+      Self.logger.error("无法保存预测历史：\(error.localizedDescription, privacy: .public)")
+    }
   }
 
   private static func displayMessage(for error: Error) -> String {

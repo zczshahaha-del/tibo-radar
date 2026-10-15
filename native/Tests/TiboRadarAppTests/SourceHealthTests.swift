@@ -68,6 +68,35 @@ final class SourceHealthTests: XCTestCase {
     XCTAssertNotEqual(try AIInputBuilder.fingerprint(bundle: bundle), original)
   }
 
+  func testPollingTimeAndAgeDoNotTriggerAnotherAnalysis() throws {
+    var bundle = freshBundle()
+    bundle.payloads[.feed] = .object([
+      "fetched_at": .string("2026-10-03T01:00:00Z"),
+      "content_age_days": .number(1),
+      "stale": .bool(false),
+      "tweets": .array([.object(["id": .string("1"), "text": .string("same post")])]),
+    ])
+    bundle.payloads[.forecast] = .object(["age_days": .number(1)])
+    let original = try AIInputBuilder.fingerprint(bundle: bundle)
+    var feed = bundle.payloads[.feed]!.objectValue!
+    feed["fetched_at"] = .string("2026-10-03T01:59:00Z")
+    feed["content_age_days"] = .number(1.04)
+    bundle.payloads[.feed] = .object(feed)
+    bundle.payloads[.forecast] = .object(["age_days": .number(1.04)])
+    XCTAssertEqual(try AIInputBuilder.fingerprint(bundle: bundle), original)
+    let context = try AIInputBuilder.makeContext(bundle: bundle, now: now)
+    XCTAssertTrue(context.contains("2026-10-03T01:59:00Z"))
+    XCTAssertTrue(context.contains("1.04"))
+
+    feed["stale"] = .bool(true)
+    bundle.payloads[.feed] = .object(feed)
+    XCTAssertNotEqual(try AIInputBuilder.fingerprint(bundle: bundle), original)
+    feed["stale"] = .bool(false)
+    feed["tweets"] = .array([.object(["id": .string("1"), "text": .string("edited post")])])
+    bundle.payloads[.feed] = .object(feed)
+    XCTAssertNotEqual(try AIInputBuilder.fingerprint(bundle: bundle), original)
+  }
+
   private func freshBundle() -> SourceBundle {
     SourceBundle(
       payloads: Dictionary(uniqueKeysWithValues: RadarSource.allCases.map { ($0, JSONValue.object([:])) }),

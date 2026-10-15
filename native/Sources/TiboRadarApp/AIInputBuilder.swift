@@ -7,6 +7,8 @@ enum AIInputBuilder {
   }
 
   static func fingerprint(bundle: SourceBundle) throws -> String {
+    // Polling timestamps and continuously increasing ages do not change the evidence.
+    // Keep them in the AI input, while periodic refresh still accounts for elapsed time.
     let stableContext = try serializedContext(
       bundle: bundle,
       now: Date(timeIntervalSince1970: 0),
@@ -29,9 +31,9 @@ enum AIInputBuilder {
     if let forecast = bundle.payloads[.forecast]?.objectValue {
       context["historical_baseline"] = jsonObject(
         selecting: [
-          "last_reset_at", "age_days", "cadence", "time_window", "probabilities",
+          "last_reset_at", "cadence", "time_window", "probabilities",
           "backtest", "model", "wait_comparison",
-        ],
+        ] + (includeHealthAssessment ? ["age_days"] : []),
         from: forecast
       )
     }
@@ -41,8 +43,8 @@ enum AIInputBuilder {
     if let feed = bundle.payloads[.feed]?.objectValue {
       context["tibo_feed_freshness"] = jsonObject(
         selecting: [
-          "fetched_at", "newest_post_at", "signal_newest_post_at", "content_age_days", "stale",
-        ],
+          "newest_post_at", "signal_newest_post_at", "stale",
+        ] + (includeHealthAssessment ? ["fetched_at", "content_age_days"] : []),
         from: feed
       )
       context["recent_tibo_feed"] = trimmedObjects(
@@ -54,7 +56,7 @@ enum AIInputBuilder {
         ]
       )
       context["recent_tibo_posts"] = recentTiboPosts(feed["tweets"], limit: 12)
-      context["recent_tibo_context"] = recentTiboContext(
+      context["recent_tibo_context"] = recentTiboPosts(
         feed["radar_context"],
         limit: 12
       )
@@ -149,13 +151,6 @@ enum AIInputBuilder {
       appendLocalTimes(from: post, to: &result)
       return result
     }
-  }
-
-  private static func recentTiboContext(
-    _ value: JSONValue?,
-    limit: Int
-  ) -> [[String: Any]] {
-    recentTiboPosts(value, limit: limit)
   }
 
   private static func appendLocalTimes(

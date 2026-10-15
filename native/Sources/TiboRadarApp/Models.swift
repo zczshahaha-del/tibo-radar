@@ -30,7 +30,6 @@ struct Evidence: Identifiable, Codable, Equatable, Sendable {
   let label: String
   let detail: String
   let category: String
-  let delta: Int
   let sourceURL: URL?
   let sourceDate: Date?
 
@@ -39,7 +38,6 @@ struct Evidence: Identifiable, Codable, Equatable, Sendable {
     label: String,
     detail: String,
     category: String = "context",
-    delta: Int = 0,
     sourceURL: URL? = nil,
     sourceDate: Date? = nil
   ) {
@@ -47,7 +45,6 @@ struct Evidence: Identifiable, Codable, Equatable, Sendable {
     self.label = label
     self.detail = detail
     self.category = category
-    self.delta = delta
     self.sourceURL = sourceURL
     self.sourceDate = sourceDate
   }
@@ -67,15 +64,6 @@ enum UsageAdvice: String, Codable, Equatable, Sendable {
   case watch
   case accelerate
   case useNow = "use_now"
-
-  var label: String {
-    switch self {
-    case .normal: "正常使用"
-    case .watch: "开始关注"
-    case .accelerate: "可以加速使用"
-    case .useNow: "尽快使用"
-    }
-  }
 }
 
 struct ForecastProbabilityRange: Codable, Equatable, Sendable {
@@ -89,13 +77,6 @@ struct ForecastProbabilityRange: Codable, Equatable, Sendable {
 enum ProbabilityQuality: String, Codable, Equatable, Sendable {
   case historicalEstimate
   case calibrated
-
-  var label: String {
-    switch self {
-    case .historicalEstimate: "历史估计"
-    case .calibrated: "已校准"
-    }
-  }
 }
 
 struct ProbabilityEstimate: Codable, Equatable, Sendable {

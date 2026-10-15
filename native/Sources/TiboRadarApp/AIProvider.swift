@@ -30,15 +30,6 @@ enum AIProvider: String, CaseIterable, Codable, Identifiable, Sendable {
       )!
     }
   }
-
-  var capabilityNote: String {
-    switch self {
-    case .deepSeek:
-      "分析 App 采集的 Tibo、历史事件和官方状态原文。"
-    case .qwen:
-      "除 App 采集的原文外，还会启用百炼联网搜索。"
-    }
-  }
 }
 
 struct AIConfiguration: Equatable, Sendable {
