@@ -175,6 +175,7 @@ struct RadarPopoverView: View {
       Text("\(model.selectedProvider.displayName) · \(AIRefreshSchedule.label)")
         .font(.system(size: 10))
         .foregroundStyle(.secondary)
+        .help("每 5 分钟检查公开消息；重要变化时立即分析，无变化时每 2 小时重新预测。")
 
       Spacer()
 

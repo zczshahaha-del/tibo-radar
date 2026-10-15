@@ -13,7 +13,8 @@ final class AIRefreshGateTests: XCTestCase {
     let start = Date(timeIntervalSince1970: 100_000)
 
     XCTAssertEqual(AIRefreshSchedule.automaticInterval, 7_200)
-    XCTAssertEqual(AIRefreshSchedule.label, "每 2 小时检查")
+    XCTAssertEqual(AIRefreshSchedule.messageCheckInterval, 300)
+    XCTAssertEqual(AIRefreshSchedule.label, "每 5 分钟检查")
     gate.recordSuccess(
       configuration: configuration,
       sourceFingerprint: "same",

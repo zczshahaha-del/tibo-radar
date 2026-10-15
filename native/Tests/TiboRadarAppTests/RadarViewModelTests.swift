@@ -3,13 +3,30 @@ import XCTest
 
 @testable import TiboRadarApp
 
+private final class ViewModelResponses: @unchecked Sendable {
+  private let lock = NSLock()
+  private var feedData: Data?
+  func setFeed(_ data: Data?) {
+    lock.lock()
+    defer { lock.unlock() }
+    feedData = data
+  }
+  func feed() -> Data? {
+    lock.lock()
+    defer { lock.unlock() }
+    return feedData
+  }
+}
+
 private final class ViewModelURLProtocol: URLProtocol, @unchecked Sendable {
+  static let responses = ViewModelResponses()
   override class func canInit(with request: URLRequest) -> Bool { true }
   override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
   override func startLoading() {
     let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
     client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-    client?.urlProtocol(self, didLoad: Data("{}".utf8))
+    let data = request.url == RadarSource.feed.url ? Self.responses.feed() : nil
+    client?.urlProtocol(self, didLoad: data ?? Data("{}".utf8))
     client?.urlProtocolDidFinishLoading(self)
   }
   override func stopLoading() {}
@@ -27,11 +44,16 @@ private final class ViewModelKeys: APIKeyStoring, @unchecked Sendable {
 }
 
 private actor SuspendedAnalyzer: AIAnalyzing {
+  var automaticAnalysis: AIAnalysis?
   var pending: [CheckedContinuation<AIAnalysis, Error>] = []
   var requestCount = 0
   var waiters: [(Int, CheckedContinuation<Void, Never>)] = []
   func analyze(context: String, configuration: AIConfiguration, apiKey: String) async throws -> AIAnalysis {
-    try await withCheckedThrowingContinuation { continuation in
+    if let automaticAnalysis {
+      requestCount += 1
+      return automaticAnalysis
+    }
+    return try await withCheckedThrowingContinuation { continuation in
       pending.append(continuation)
       requestCount += 1
       waiters.filter { $0.0 <= requestCount }.forEach { $0.1.resume() }
@@ -43,6 +65,7 @@ private actor SuspendedAnalyzer: AIAnalyzing {
     await withCheckedContinuation { waiters.append((count, $0)) }
   }
   func finish(_ result: Result<AIAnalysis, Error>) { pending.removeFirst().resume(with: result) }
+  func respondAutomatically(with analysis: AIAnalysis) { automaticAnalysis = analysis }
   func testConnection(configuration: AIConfiguration, apiKey: String) async throws {}
 }
 
@@ -52,6 +75,7 @@ final class RadarViewModelTests: XCTestCase {
     RadarViewModel, SuspendedAnalyzer, ViewModelKeys, ProviderPreferences, AISnapshotStore, () -> Void
   ) {
     let suite = "TiboRadar.viewmodel-test.\(UUID().uuidString)"
+    ViewModelURLProtocol.responses.setFeed(nil)
     let defaults = UserDefaults(suiteName: suite)!
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
     let configuration = URLSessionConfiguration.ephemeral
@@ -73,6 +97,40 @@ final class RadarViewModelTests: XCTestCase {
   }
 
   @MainActor
+  func testFrequentChecksSkipChatterButAnalyzeAnImportantPostImmediately() async throws {
+    let (model, analyzer, _, _, _, cleanup) = try fixture()
+    defer { cleanup() }
+    await analyzer.respondAutomatically(with: analysis())
+    await model.refresh(force: false)
+    let firstCount = await analyzer.requestCount
+    XCTAssertEqual(firstCount, 1)
+    let chatter: JSONValue = .object(["radar_context": .array([.object([
+      "id": .string("smalltalk"), "text": .string("Thanks!"), "is_reply": .bool(true),
+      "in_reply_to_tweet_id": .string("parent"),
+      "reply_context": .object(["parent": .object(["text": .string("Nice wallpaper")])]),
+    ])])])
+    // Empty arrays and an empty feed describe the same lack of important content.
+    ViewModelURLProtocol.responses.setFeed(try JSONEncoder().encode(chatter))
+    await model.refresh(force: false)
+    let chatterCount = await analyzer.requestCount
+    XCTAssertEqual(chatterCount, 1)
+    let reset: JSONValue = .object(["radar_context": .array([.object([
+      "id": .string("announcement"), "text": .string("Loading a banked reset for everyone"),
+      "is_reply": .bool(false),
+    ])])])
+    ViewModelURLProtocol.responses.setFeed(try JSONEncoder().encode(reset))
+    await model.refresh(force: false)
+    let importantCount = await analyzer.requestCount
+    XCTAssertEqual(importantCount, 2)
+    await model.refresh(force: false)
+    let duplicateCount = await analyzer.requestCount
+    XCTAssertEqual(duplicateCount, 2)
+    await model.refresh()
+    let forcedCount = await analyzer.requestCount
+    XCTAssertEqual(forcedCount, 3)
+  }
+
+  @MainActor
   func testUnchangedAutomaticRefreshReusesPredictionAndRecordsHistory() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
@@ -86,7 +144,7 @@ final class RadarViewModelTests: XCTestCase {
     let generatedAt = model.snapshot?.generatedAt
     await model.refresh(force: false)
     XCTAssertEqual(model.snapshot?.generatedAt, generatedAt)
-    XCTAssertEqual(try history.load().map(\.event), [.startup, .refreshSucceeded, .refreshReused])
+    XCTAssertEqual(try history.load().map(\.event), [.startup, .refreshSucceeded])
   }
 
   @MainActor

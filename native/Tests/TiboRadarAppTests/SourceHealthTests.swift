@@ -65,7 +65,7 @@ final class SourceHealthTests: XCTestCase {
     bundle.receivedAt = bundle.receivedAt.mapValues { $0.addingTimeInterval(60) }
     XCTAssertEqual(try AIInputBuilder.fingerprint(bundle: bundle), original)
     bundle.cacheFallbacks.insert(.forecast)
-    XCTAssertNotEqual(try AIInputBuilder.fingerprint(bundle: bundle), original)
+    XCTAssertEqual(try AIInputBuilder.fingerprint(bundle: bundle), original)
   }
 
   func testPollingTimeAndAgeDoNotTriggerAnotherAnalysis() throws {
@@ -90,7 +90,7 @@ final class SourceHealthTests: XCTestCase {
 
     feed["stale"] = .bool(true)
     bundle.payloads[.feed] = .object(feed)
-    XCTAssertNotEqual(try AIInputBuilder.fingerprint(bundle: bundle), original)
+    XCTAssertEqual(try AIInputBuilder.fingerprint(bundle: bundle), original)
     feed["stale"] = .bool(false)
     feed["tweets"] = .array([.object(["id": .string("1"), "text": .string("edited post")])])
     bundle.payloads[.feed] = .object(feed)

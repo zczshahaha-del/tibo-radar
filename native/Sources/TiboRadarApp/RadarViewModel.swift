@@ -63,8 +63,8 @@ final class RadarViewModel: ObservableObject {
       await self.notifications.prepareAuthorization()
       await self.refresh(force: false)
     }
-    refreshTimer = Timer.scheduledTimer(
-      withTimeInterval: AIRefreshSchedule.automaticInterval,
+    refreshTimer = Timer(
+      timeInterval: AIRefreshSchedule.messageCheckInterval,
       repeats: true
     ) {
       [weak self] _ in
@@ -73,6 +73,7 @@ final class RadarViewModel: ObservableObject {
         await self?.refresh(force: false)
       }
     }
+    if let refreshTimer { RunLoop.main.add(refreshTimer, forMode: .common) }
   }
 
   init(previewSnapshot: PredictionSnapshot) {
@@ -124,7 +125,6 @@ final class RadarViewModel: ObservableObject {
       if configuration.provider == .deepSeek, bundle.payloads.isEmpty {
         throw AIProviderError.invalidAnalysis("没有获取到可供 DeepSeek 判断的公开资料。")
       }
-      let context = try AIInputBuilder.makeContext(bundle: bundle)
       let fingerprint = try AIInputBuilder.fingerprint(bundle: bundle)
       if !refreshGate.shouldAnalyze(
         configuration: configuration,
@@ -132,10 +132,14 @@ final class RadarViewModel: ObservableObject {
         force: force
       ), let cached = snapshotStore.load(for: configuration.provider) {
         let warnings = SourceHealth.assess(bundle: bundle).compactMap(\.warning) + bundle.errors
-        snapshot = warnings.isEmpty ? cached : cached.markedStale(reason: warnings.joined(separator: "；"))
-        recordHistory(.refreshReused)
+        let reused = warnings.isEmpty ? cached : cached.markedStale(reason: warnings.joined(separator: "；"))
+        if snapshot != reused {
+          snapshot = reused
+          recordHistory(.refreshReused)
+        }
         return
       }
+      let context = try AIInputBuilder.makeContext(bundle: bundle)
       let analysis = try await analyzer.analyze(
         context: context,
         configuration: configuration,

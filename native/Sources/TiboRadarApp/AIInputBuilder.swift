@@ -1,5 +1,4 @@
 import Foundation
-import CryptoKit
 
 enum AIInputBuilder {
   static func makeContext(bundle: SourceBundle, now: Date = Date()) throws -> String {
@@ -7,20 +6,11 @@ enum AIInputBuilder {
   }
 
   static func fingerprint(bundle: SourceBundle) throws -> String {
-    // Polling timestamps and continuously increasing ages do not change the evidence.
-    // Keep them in the AI input, while periodic refresh still accounts for elapsed time.
-    let stableContext = try serializedContext(
-      bundle: bundle,
-      now: Date(timeIntervalSince1970: 0),
-      includeHealthAssessment: false
-    )
-    return SHA256.hash(data: Data(stableContext.utf8))
-      .map { String(format: "%02x", $0) }
-      .joined()
+    try AIChangeDetector.fingerprint(bundle: bundle)
   }
 
   private static func serializedContext(
-    bundle: SourceBundle, now: Date, includeHealthAssessment: Bool = true
+    bundle: SourceBundle, now: Date
   ) throws -> String {
     var context: [String: Any] = [
       "analysis_policy_version": 2,
@@ -31,9 +21,9 @@ enum AIInputBuilder {
     if let forecast = bundle.payloads[.forecast]?.objectValue {
       context["historical_baseline"] = jsonObject(
         selecting: [
-          "last_reset_at", "cadence", "time_window", "probabilities",
+          "last_reset_at", "age_days", "cadence", "time_window", "probabilities",
           "backtest", "model", "wait_comparison",
-        ] + (includeHealthAssessment ? ["age_days"] : []),
+        ],
         from: forecast
       )
     }
@@ -43,8 +33,8 @@ enum AIInputBuilder {
     if let feed = bundle.payloads[.feed]?.objectValue {
       context["tibo_feed_freshness"] = jsonObject(
         selecting: [
-          "newest_post_at", "signal_newest_post_at", "stale",
-        ] + (includeHealthAssessment ? ["fetched_at", "content_age_days"] : []),
+          "fetched_at", "newest_post_at", "signal_newest_post_at", "content_age_days", "stale",
+        ],
         from: feed
       )
       context["recent_tibo_feed"] = trimmedObjects(
@@ -69,15 +59,13 @@ enum AIInputBuilder {
     }
     context["source_errors"] = bundle.errors
     context["cached_sources"] = bundle.cacheFallbacks.map(\.rawValue).sorted()
-    if includeHealthAssessment {
-      context["source_health"] = SourceHealth.assess(bundle: bundle, now: now).map { health in
-        var item: [String: Any] = ["source": health.source.rawValue, "state": health.state.rawValue]
-        if let checkedAt = health.checkedAt {
-          item["checked_at"] = ISO8601DateFormatter().string(from: checkedAt)
-        }
-        if let warning = health.warning { item["warning"] = warning }
-        return item
+    context["source_health"] = SourceHealth.assess(bundle: bundle, now: now).map { health in
+      var item: [String: Any] = ["source": health.source.rawValue, "state": health.state.rawValue]
+      if let checkedAt = health.checkedAt {
+        item["checked_at"] = ISO8601DateFormatter().string(from: checkedAt)
       }
+      if let warning = health.warning { item["warning"] = warning }
+      return item
     }
 
     let data = try JSONSerialization.data(
